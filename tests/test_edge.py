@@ -1,26 +1,22 @@
-from unittest import TestCase
 import os
 
-from nose.tools import eq_
 import pandas as pd
+import pytest
 
 from pyculiarity import detect_ts
-from pyculiarity.date_utils import date_format
 
 
-class TestEdge(TestCase):
+@pytest.fixture
+def midnight_data():
+    path = os.path.dirname(os.path.realpath(__file__))
+    data = pd.read_csv(
+        os.path.join(path, 'midnight_test_data.csv'),
+        usecols=['date', 'value'])
+    data['date'] = pd.to_datetime(data['date']).map(pd.Timestamp.timestamp).astype(int)
+    return data
 
-    def setUp(self):
-        self.path = os.path.dirname(os.path.realpath(__file__))
 
-    def test_check_midnight_date_format(self):
-        data = pd.read_csv(os.path.join(self.path,
-                                        'midnight_test_data.csv'),
-                           usecols=['date', 'value'])
-
-        data.date = date_format(data.date, "%Y-%m-%d %H:%M:%S")
-        results = detect_ts(data, max_anoms=0.2, threshold=None,
-                            direction='both', plot=False,
-                            only_last="day",
-                            e_value=True)
-        eq_(len(results['anoms'].anoms), len(results['anoms'].expected_value))
+def test_check_midnight_date_format(midnight_data):
+    results = detect_ts(midnight_data, max_anoms=0.2, threshold=None,
+                        direction='both', e_value=True, granularity='hr')
+    assert len(results['anoms'].anoms) == len(results['anoms'].expected_value)

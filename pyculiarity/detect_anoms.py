@@ -1,11 +1,10 @@
 from itertools import groupby
 from math import sqrt
 
-from future.utils import lmap, lrange
 from scipy.stats import t as student_t
 from statsmodels.robust.scale import mad
 import numpy as np
-import pandas as ps
+import pandas as pd
 
 from pyculiarity.stl import stl
 
@@ -43,10 +42,10 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
         return None
 
     # run length encode result of isnull, check for internal nulls
-    if (len(lmap(lambda x: x[0], list(groupby(ps.isnull(
-            ps.concat([ps.Series([np.nan]),
+    if (len(list(x[0] for x in groupby(pd.isnull(
+            pd.concat([pd.Series([np.nan]),
                        data.value,
-                       ps.Series([np.nan])])))))) > 3):
+                       pd.Series([np.nan])]))))) > 3):
         raise ValueError("Data contains non-leading NAs. We suggest replacing NAs with interpolated values (see na.approx in Zoo package).")
     else:
         data = data.dropna()
@@ -55,18 +54,18 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
 
     data = data.set_index('timestamp')
 
-    if not isinstance(data.index, ps.Int64Index):
+    if not pd.api.types.is_integer_dtype(data.index):
         resample_period = {
-            1440: 'T',
-            24: 'H',
+            1440: 'min',
+            24: 'h',
             7: 'D'
         }
         resample_period = resample_period.get(num_obs_per_period)
         if not resample_period:
-            raise ValueError('Unsupported resample period: %d' %resample_period)
-        data = data.resample(resample_period)
+            raise ValueError('Unsupported resample period: %d' % num_obs_per_period)
+        data = data.resample(resample_period).mean().dropna()
 
-    decomp = stl(data.value, np=num_obs_per_period)
+    decomp = stl(data.value, period=num_obs_per_period)
 
     # Remove the seasonal component, and the median of the data to create the
     # univariate remainder
@@ -74,13 +73,13 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
         'timestamp': data.index,
         'value': data.value - decomp['seasonal'] - data.value.median()
     }
-    data = ps.DataFrame(d)
+    data = pd.DataFrame(d)
 
     p = {
         'timestamp': decomp.index,
-        'value': (decomp['trend'] + decomp['seasonal']).truncate().convert_objects(convert_numeric=True)
+        'value': pd.to_numeric((decomp['trend'] + decomp['seasonal']).truncate(), errors='coerce')
     }
-    data_decomp = ps.DataFrame(p)
+    data_decomp = pd.DataFrame(p)
 
     # Maximum number of outliers that S-H-ESD can detect (e.g. 49% of data)
     max_outliers = int(num_obs * k)
@@ -92,13 +91,13 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
 
     # Define values and vectors.
     n = len(data.timestamp)
-    R_idx = lrange(max_outliers)
+    R_idx = list(range(max_outliers))
 
     num_anoms = 0
 
     # Compute test statistic until r=max_outliers values have been
     # removed from the sample.
-    for i in lrange(1, max_outliers + 1):
+    for i in range(1, max_outliers + 1):
         if one_tail:
             if upper_tail:
                 ares = data.value - data.value.median()

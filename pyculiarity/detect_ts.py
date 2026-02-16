@@ -3,12 +3,10 @@ from collections import namedtuple
 import datetime
 import copy
 
-from past.builtins import basestring
-from pandas import DataFrame, to_datetime
-from pandas.lib import Timestamp
+from pandas import DataFrame, Timestamp
 import numpy as np
+import pandas as pd
 
-from pyculiarity.date_utils import get_gran
 from pyculiarity.detect_anoms import detect_anoms
 
 Direction = namedtuple('Direction', ['one_tail', 'upper_tail'])
@@ -68,7 +66,7 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
             raise ValueError('''data must be a 2 column data.frame, with the first column being a set of timestamps, and
                                 the second coloumn being numeric values.''')
 
-        if not (df.dtypes[0].type is np.float64) and not (df.dtypes[0].type is np.int64):
+        if df.dtypes.iloc[0].type is not np.float64 and df.dtypes.iloc[0].type is not np.int64:
             raise ValueError('''The input timestamp column must be a float or integer of the unix timestamp, not date
                                 time columns, date strings or pd.TimeStamp columns.''')
 
@@ -119,7 +117,7 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
         raise ValueError('%s granularity detected. This is currently not supported.' % (gran, ))
 
     # now convert the timestamp column into a proper timestamp
-    df['timestamp'] = df['timestamp'].map(lambda x: datetime.datetime.utcfromtimestamp(x))
+    df['timestamp'] = df['timestamp'].map(lambda x: datetime.datetime.fromtimestamp(x, tz=datetime.timezone.utc))
 
     num_obs = len(df.value)
 
@@ -135,13 +133,13 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
             num_obs_in_period = period * 7 * piecewise_median_period_weeks
             num_days_in_period = 7 * piecewise_median_period_weeks
 
-        last_date = df.timestamp.iget(-1)
+        last_date = df.timestamp.iloc[-1]
 
         all_data = []
 
         for j in range(0, len(df.timestamp), num_obs_in_period):
-            start_date = df.timestamp.iget(j)
-            end_date = min(start_date + datetime.timedelta(days=num_obs_in_period), df.timestamp.iget(-1))
+            start_date = df.timestamp.iloc[j]
+            end_date = min(start_date + datetime.timedelta(days=num_obs_in_period), df.timestamp.iloc[-1])
 
             # if there is at least 14 days left, subset it, otherwise subset last_date - 14days
             if (end_date - start_date).days == num_days_in_period:
@@ -207,16 +205,12 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
             # Remove any anoms below the threshold
             anoms = anoms[anoms.value >= thresh]
 
-        all_anoms = all_anoms.append(anoms)
-        seasonal_plus_trend = seasonal_plus_trend.append(data_decomp)
+        all_anoms = pd.concat([all_anoms, anoms])
+        seasonal_plus_trend = pd.concat([seasonal_plus_trend, data_decomp])
 
     # Cleanup potential duplicates
-    try:
-        all_anoms.drop_duplicates(subset=['timestamp'])
-        seasonal_plus_trend.drop_duplicates(subset=['timestamp'])
-    except TypeError:
-        all_anoms.drop_duplicates(cols=['timestamp'])
-        seasonal_plus_trend.drop_duplicates(cols=['timestamp'])
+    all_anoms.drop_duplicates(subset=['timestamp'])
+    seasonal_plus_trend.drop_duplicates(subset=['timestamp'])
 
     # Calculate number of anomalies as a percentage
     anom_pct = (len(df.value) / float(num_obs)) * 100
@@ -246,7 +240,6 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
     anoms = DataFrame(d, index=d['timestamp'].index)
 
     # convert timestamps back to unix time
-    anoms['timestamp'] = anoms['timestamp'].astype(np.int64)
-    anoms['timestamp'] = anoms['timestamp'].map(lambda x: x * 10e-10)
+    anoms['timestamp'] = anoms['timestamp'].map(pd.Timestamp.timestamp)
 
     return {'anoms': anoms}

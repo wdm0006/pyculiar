@@ -5,7 +5,7 @@ from numpy import hstack
 import statsmodels.api as sm
 
 
-def stl(data, np=3600):
+def stl(data, period=3600):
     """
     Seasonal-Trend decomposition procedure based on LOESS
 
@@ -18,10 +18,10 @@ def stl(data, np=3600):
         seasonal component at a given point in the seasonal cycle (e.g., January
         values of a monthly series with  a  yearly cycle) become smoother.
 
-    np : int
+    period : int
         Period of the seasonal component.
         For example, if  the  time series is monthly with a yearly cycle, then
-        np=12.
+        period=12.
         If no value is given, then the period will be determined from the
         ``data`` timeseries.
     """
@@ -32,7 +32,7 @@ def stl(data, np=3600):
     # here we use the python statsmodels STL decomposition instead of R's
     # decompose
 
-    res = sm.tsa.seasonal_decompose(data.values, model='additive', freq=np)
+    res = sm.tsa.seasonal_decompose(data.values, model='additive', period=period)
     res_ts = DataFrame(hstack((res.trend.reshape(-1, 1),
                                res.seasonal.reshape(-1, 1),
                                res.resid.reshape(-1, 1))),

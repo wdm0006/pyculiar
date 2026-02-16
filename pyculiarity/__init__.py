@@ -7,6 +7,6 @@
     :license: GPL, see LICENSE for more details.
 """
 
-__version__ = '0.0.2'
+__version__ = '0.1.0'
 
-from pyculiarity.detect_ts import detect_ts
+from pyculiarity.detect_ts import detect_ts as detect_ts

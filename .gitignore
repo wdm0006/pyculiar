@@ -1,8 +1,11 @@
 .DS_Store
-*.pyc
-*.pyo
-env
-env*
-dist
+__pycache__/
+*.py[cod]
 *.egg
-*.egg-info
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+.ruff_cache/
+*.so

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyculiar"
+version = "0.1.0"
+description = "A pure Python port of Twitter's AnomalyDetection R Package."
+readme = "README.md"
+license = "GPL-3.0-only"
+requires-python = ">=3.10"
+authors = [
+    { name = "Will McGinnis", email = "will@predikto.com" },
+    { name = "Nicolas Steven Miller" },
+]
+keywords = ["data", "anomaly", "detection", "pandas", "timeseries"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "numpy",
+    "pandas>=2.0",
+    "scipy",
+    "statsmodels",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.urls]
+Homepage = "https://github.com/wdm0006/pyculiarity"
+
+[tool.setuptools.packages.find]
+include = ["pyculiarity*"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
