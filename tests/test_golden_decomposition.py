@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pyculiarity._cext.anomaly_module import seasonal_decompose
+from pyculiar._cext.anomaly_module import seasonal_decompose
 
 
 @pytest.fixture

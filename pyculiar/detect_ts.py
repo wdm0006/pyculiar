@@ -28,7 +28,7 @@ from pandas import DataFrame, Timestamp
 import numpy as np
 import pandas as pd
 
-from pyculiarity.detect_anoms import detect_anoms
+from pyculiar.detect_anoms import detect_anoms
 
 Direction = namedtuple("Direction", ["one_tail", "upper_tail"])
 

@@ -1,5 +1,5 @@
-pyculiarity
-===========
+pyculiar
+========
 
 Anomaly detection for time series using S-H-ESD (Seasonal Hybrid Extreme Studentized Deviate), inspired by
 Twitter's [AnomalyDetection](https://github.com/twitter/AnomalyDetection) R package.
@@ -37,7 +37,7 @@ The main entry point is `detect_ts`, which expects a two-column Pandas DataFrame
 numeric values.
 
 ```python
-from pyculiarity import detect_ts
+from pyculiar import detect_ts
 import pandas as pd
 
 data = pd.read_csv('tests/raw_data.csv', usecols=['timestamp', 'count'])

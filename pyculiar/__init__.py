@@ -21,9 +21,9 @@
 # SOFTWARE.
 
 """
-pyculiarity — Anomaly detection for time series using S-H-ESD.
+pyculiar — Anomaly detection for time series using S-H-ESD.
 """
 
 __version__ = "0.2.0"
 
-from pyculiarity.detect_ts import detect_ts as detect_ts
+from pyculiar.detect_ts import detect_ts as detect_ts

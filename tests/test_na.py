@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import pytest
 
-from pyculiarity import detect_ts
+from pyculiar import detect_ts
 
 
 @pytest.fixture

@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pyculiarity.detect_anoms import detect_anoms
+from pyculiar.detect_anoms import detect_anoms
 
 
 @pytest.fixture

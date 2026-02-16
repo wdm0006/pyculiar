@@ -36,10 +36,10 @@ dev = ["pytest", "ruff", "scipy", "statsmodels"]
 Homepage = "https://github.com/wdm0006/pyculiarity"
 
 [tool.setuptools.packages.find]
-include = ["pyculiarity*"]
+include = ["pyculiar*"]
 
 [tool.setuptools.package-data]
-"pyculiarity._cext" = ["*.c", "*.pyi"]
+"pyculiar._cext" = ["*.c", "*.pyi"]
 
 [tool.ruff]
 line-length = 120

@@ -10,8 +10,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pyculiarity import detect_ts
-from pyculiarity.detect_anoms import detect_anoms
+from pyculiar import detect_ts
+from pyculiar.detect_anoms import detect_anoms
 
 
 @pytest.fixture

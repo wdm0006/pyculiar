@@ -7,7 +7,7 @@ so the C rewrite can be validated.
 import numpy as np
 import pytest
 
-from pyculiarity._cext.anomaly_module import median as _c_median, mad as _c_mad, t_ppf as _c_t_ppf
+from pyculiar._cext.anomaly_module import median as _c_median, mad as _c_mad, t_ppf as _c_t_ppf
 
 
 # ---------------------------------------------------------------------------

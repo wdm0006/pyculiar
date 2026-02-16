@@ -25,8 +25,8 @@ from itertools import groupby
 import numpy as np
 import pandas as pd
 
-from pyculiarity._cext.anomaly_module import seasonal_decompose as c_seasonal_decompose
-from pyculiarity._cext.anomaly_module import esd_test as c_esd_test
+from pyculiar._cext.anomaly_module import seasonal_decompose as c_seasonal_decompose
+from pyculiar._cext.anomaly_module import esd_test as c_esd_test
 
 
 def detect_anoms(

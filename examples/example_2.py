@@ -1,4 +1,4 @@
-from pyculiarity import detect_ts
+from pyculiar import detect_ts
 import matplotlib.pyplot as plt
 import pandas as pd
 import matplotlib
