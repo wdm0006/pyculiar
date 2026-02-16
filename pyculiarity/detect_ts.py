@@ -30,11 +30,22 @@ import pandas as pd
 
 from pyculiarity.detect_anoms import detect_anoms
 
-Direction = namedtuple('Direction', ['one_tail', 'upper_tail'])
+Direction = namedtuple("Direction", ["one_tail", "upper_tail"])
 
 
-def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e_value=False, longterm=False,
-              piecewise_median_period_weeks=2, granularity='day', verbose=False, inplace=True):
+def detect_ts(
+    df,
+    max_anoms=0.10,
+    direction="pos",
+    alpha=0.05,
+    threshold=None,
+    e_value=False,
+    longterm=False,
+    piecewise_median_period_weeks=2,
+    granularity="day",
+    verbose=False,
+    inplace=True,
+):
     """
     Anomaly Detection Using Seasonal Hybrid ESD Test
     A technique for detecting anomalies in seasonal univariate time series where the input is a
@@ -84,12 +95,12 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
         raise ValueError("data must be a single data frame.")
     else:
         if len(df.columns) != 2 or not df.iloc[:, 1].map(np.isreal).all():
-            raise ValueError('''data must be a 2 column data.frame, with the first column being a set of timestamps, and
-                                the second coloumn being numeric values.''')
+            raise ValueError("""data must be a 2 column data.frame, with the first column being a set of timestamps, and
+                                the second coloumn being numeric values.""")
 
         if df.dtypes.iloc[0].type is not np.float64 and df.dtypes.iloc[0].type is not np.int64:
-            raise ValueError('''The input timestamp column must be a float or integer of the unix timestamp, not date
-                                time columns, date strings or pd.TimeStamp columns.''')
+            raise ValueError("""The input timestamp column must be a float or integer of the unix timestamp, not date
+                                time columns, date strings or pd.TimeStamp columns.""")
 
     if not inplace:
         df = copy.deepcopy(df)
@@ -101,17 +112,21 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
     # Sanity check all input parameters
     if max_anoms > 0.49:
         length = len(df.value)
-        raise ValueError("max_anoms must be less than 50%% of the data points (max_anoms =%f data_points =%s)." % (round(max_anoms * length, 0), length))
+        raise ValueError(
+            "max_anoms must be less than 50%% of the data points (max_anoms =%f data_points =%s)."
+            % (round(max_anoms * length, 0), length)
+        )
 
-    if direction not in ['pos', 'neg', 'both']:
+    if direction not in ["pos", "neg", "both"]:
         raise ValueError("direction options are: pos | neg | both.")
 
     if not (0.01 <= alpha or alpha <= 0.1):
         if verbose:
             import warnings
+
             warnings.warn("alpha is the statistical signifigance, and is usually between 0.01 and 0.1")
 
-    if threshold not in [None, 'med_max', 'p95', 'p99']:
+    if threshold not in [None, "med_max", "p95", "p99"]:
         raise ValueError("threshold options are: None | med_max | p95 | p99")
 
     if not isinstance(e_value, bool):
@@ -121,28 +136,21 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
         raise ValueError("longterm must be a boolean")
 
     if piecewise_median_period_weeks < 2:
-        raise ValueError(
-            "piecewise_median_period_weeks must be at greater than 2 weeks")
+        raise ValueError("piecewise_median_period_weeks must be at greater than 2 weeks")
 
     # if the data is daily, then we need to bump the period to weekly to get multiple examples
     gran = granularity
-    gran_period = {
-        'ms': 60000,
-        'sec': 3600,
-        'min': 1440,
-        'hr': 24,
-        'day': 7
-    }
+    gran_period = {"ms": 60000, "sec": 3600, "min": 1440, "hr": 24, "day": 7}
     period = gran_period.get(gran)
     if not period:
-        raise ValueError('%s granularity detected. This is currently not supported.' % (gran, ))
+        raise ValueError("%s granularity detected. This is currently not supported." % (gran,))
 
     # now convert the timestamp column into a proper timestamp
-    df['timestamp'] = df['timestamp'].map(lambda x: datetime.datetime.fromtimestamp(x, tz=datetime.timezone.utc))
+    df["timestamp"] = df["timestamp"].map(lambda x: datetime.datetime.fromtimestamp(x, tz=datetime.timezone.utc))
 
     num_obs = len(df.value)
 
-    clamp = (1 / float(num_obs))
+    clamp = 1 / float(num_obs)
     if max_anoms < clamp:
         max_anoms = clamp
 
@@ -166,48 +174,47 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
             if (end_date - start_date).days == num_days_in_period:
                 sub_df = df[(df.timestamp >= start_date) & (df.timestamp < end_date)]
             else:
-                sub_df = df[(df.timestamp > (last_date - datetime.timedelta(days=num_days_in_period))) & (df.timestamp <= last_date)]
+                sub_df = df[
+                    (df.timestamp > (last_date - datetime.timedelta(days=num_days_in_period)))
+                    & (df.timestamp <= last_date)
+                ]
             all_data.append(sub_df)
     else:
         all_data = [df]
 
-    all_anoms = DataFrame(columns=['timestamp', 'value'])
-    seasonal_plus_trend = DataFrame(columns=['timestamp', 'value'])
+    all_anoms = DataFrame(columns=["timestamp", "value"])
+    seasonal_plus_trend = DataFrame(columns=["timestamp", "value"])
 
     # Detect anomalies on all data (either entire data in one-pass, or in 2 week blocks if longterm=TRUE)
     for i in range(len(all_data)):
-        directions = {
-            'pos': Direction(True, True),
-            'neg': Direction(True, False),
-            'both': Direction(False, True)
-        }
+        directions = {"pos": Direction(True, True), "neg": Direction(True, False), "both": Direction(False, True)}
         anomaly_direction = directions[direction]
 
         # detect_anoms actually performs the anomaly detection and returns the result in a list containing the anomalies
         # as well as the decomposed components of the time series for further analysis.
 
-        s_h_esd_timestamps = detect_anoms(all_data[i],
-                                          k=max_anoms,
-                                          alpha=alpha,
-                                          num_obs_per_period=period,
-                                          use_decomp=True,
-                                          one_tail=anomaly_direction.one_tail,
-                                          upper_tail=anomaly_direction.upper_tail,
-                                          verbose=verbose)
+        s_h_esd_timestamps = detect_anoms(
+            all_data[i],
+            k=max_anoms,
+            alpha=alpha,
+            num_obs_per_period=period,
+            use_decomp=True,
+            one_tail=anomaly_direction.one_tail,
+            upper_tail=anomaly_direction.upper_tail,
+            verbose=verbose,
+        )
         if s_h_esd_timestamps is None:
-            return {
-                'anoms': DataFrame(columns=["timestamp", "anoms"])
-            }
+            return {"anoms": DataFrame(columns=["timestamp", "anoms"])}
 
         # store decomposed comps in local variable and overwrite s_h_esd_timestamps to contain only the anom timestamps
-        data_decomp = s_h_esd_timestamps['stl']
-        s_h_esd_timestamps = s_h_esd_timestamps['anoms']
+        data_decomp = s_h_esd_timestamps["stl"]
+        s_h_esd_timestamps = s_h_esd_timestamps["anoms"]
 
         # -- Step 3: Use detected anomaly timestamps to extract the actual anomalies (timestamp and value) from the data
         if s_h_esd_timestamps:
             anoms = all_data[i][all_data[i].timestamp.isin(s_h_esd_timestamps)]
         else:
-            anoms = DataFrame(columns=['timestamp', 'value'])
+            anoms = DataFrame(columns=["timestamp", "value"])
 
         # Filter the anomalies using one of the thresholding functions if applicable
         if threshold:
@@ -216,12 +223,12 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
 
             # Calculate the threshold set by the user
             thresh = 0.5
-            if threshold == 'med_max':
+            if threshold == "med_max":
                 thresh = periodic_maxes.median()
-            elif threshold == 'p95':
-                thresh = periodic_maxes.quantile(.95)
-            elif threshold == 'p99':
-                thresh = periodic_maxes.quantile(.99)
+            elif threshold == "p95":
+                thresh = periodic_maxes.quantile(0.95)
+            elif threshold == "p99":
+                thresh = periodic_maxes.quantile(0.99)
 
             # Remove any anoms below the threshold
             anoms = anoms[anoms.value >= thresh]
@@ -230,8 +237,8 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
         seasonal_plus_trend = pd.concat([seasonal_plus_trend, data_decomp])
 
     # Cleanup potential duplicates
-    all_anoms.drop_duplicates(subset=['timestamp'])
-    seasonal_plus_trend.drop_duplicates(subset=['timestamp'])
+    all_anoms.drop_duplicates(subset=["timestamp"])
+    seasonal_plus_trend.drop_duplicates(subset=["timestamp"])
 
     # Calculate number of anomalies as a percentage
     anom_pct = (len(df.value) / float(num_obs)) * 100
@@ -246,21 +253,16 @@ def detect_ts(df, max_anoms=0.10, direction='pos', alpha=0.05, threshold=None, e
 
     if e_value:
         d = {
-            'timestamp': all_anoms.timestamp,
-            'anoms': all_anoms.value,
-            'expected_value': seasonal_plus_trend[
-                seasonal_plus_trend.timestamp.isin(
-                    all_anoms.timestamp)].value
+            "timestamp": all_anoms.timestamp,
+            "anoms": all_anoms.value,
+            "expected_value": seasonal_plus_trend[seasonal_plus_trend.timestamp.isin(all_anoms.timestamp)].value,
         }
     else:
-        d = {
-            'timestamp': all_anoms.timestamp,
-            'anoms': all_anoms.value
-        }
+        d = {"timestamp": all_anoms.timestamp, "anoms": all_anoms.value}
 
-    anoms = DataFrame(d, index=d['timestamp'].index)
+    anoms = DataFrame(d, index=d["timestamp"].index)
 
     # convert timestamps back to unix time
-    anoms['timestamp'] = anoms['timestamp'].map(pd.Timestamp.timestamp)
+    anoms["timestamp"] = anoms["timestamp"].map(pd.Timestamp.timestamp)
 
-    return {'anoms': anoms}
+    return {"anoms": anoms}

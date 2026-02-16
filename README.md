@@ -9,6 +9,18 @@ This library implements the algorithm from scratch in C (as a Python extension m
 
 Licensed under the MIT License.
 
+History
+-------
+
+This project descends from two earlier implementations:
+
+- [twitter/AnomalyDetection](https://github.com/twitter/AnomalyDetection) — the original R package by Twitter (2015)
+- [nicolasmiller/pyculiarity](https://github.com/nicolasmiller/pyculiarity) — a Python port by Nicolas Steven Miller (2015), which used rpy2 to call R
+
+This fork (by [wdm0006](https://github.com/wdm0006/pyculiarity)) originally replaced the R dependency with
+statsmodels and scipy. As of v0.2.0 the computational core has been rewritten from scratch in C, eliminating all
+remaining third-party numerical dependencies beyond numpy and pandas.
+
 Installation
 ------------
 
@@ -56,3 +68,6 @@ Copyright and License
 Copyright 2025 Will McGinnis
 
 Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+Original R source Copyright 2015 Twitter, Inc and other contributors.
+Python port Copyright 2015 Nicolas Steven Miller.

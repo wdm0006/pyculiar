@@ -29,8 +29,9 @@ from pyculiarity._cext.anomaly_module import seasonal_decompose as c_seasonal_de
 from pyculiarity._cext.anomaly_module import esd_test as c_esd_test
 
 
-def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
-                 use_decomp=True, one_tail=True, upper_tail=True, verbose=False):
+def detect_anoms(
+    data, k=0.49, alpha=0.05, num_obs_per_period=None, use_decomp=True, one_tail=True, upper_tail=True, verbose=False
+):
     """
     Detects anomalies in a time series using S-H-ESD.
 
@@ -64,52 +65,50 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
         return None
 
     # run length encode result of isnull, check for internal nulls
-    if (len(list(x[0] for x in groupby(pd.isnull(
-            pd.concat([pd.Series([np.nan]),
-                       data.value,
-                       pd.Series([np.nan])]))))) > 3):
-        raise ValueError("Data contains non-leading NAs. We suggest replacing NAs with interpolated values (see na.approx in Zoo package).")
+    if (
+        len(list(x[0] for x in groupby(pd.isnull(pd.concat([pd.Series([np.nan]), data.value, pd.Series([np.nan])])))))
+        > 3
+    ):
+        raise ValueError(
+            "Data contains non-leading NAs. We suggest replacing NAs with interpolated values (see na.approx in Zoo package)."
+        )
     else:
         data = data.dropna()
 
     # -- Step 1: Decompose data. This returns a univariate remainder which will be used for anomaly detection.
 
-    data = data.set_index('timestamp')
+    data = data.set_index("timestamp")
 
     if not pd.api.types.is_integer_dtype(data.index):
-        resample_period = {
-            1440: 'min',
-            24: 'h',
-            7: 'D'
-        }
+        resample_period = {1440: "min", 24: "h", 7: "D"}
         resample_period = resample_period.get(num_obs_per_period)
         if not resample_period:
-            raise ValueError('Unsupported resample period: %d' % num_obs_per_period)
+            raise ValueError("Unsupported resample period: %d" % num_obs_per_period)
         data = data.resample(resample_period).mean().dropna()
 
     # Use C extension for seasonal decomposition
     values = data.value.tolist()
     trend_list, seasonal_list, remainder_list = c_seasonal_decompose(values, num_obs_per_period)
 
-    decomp = pd.DataFrame({
-        'trend': trend_list,
-        'seasonal': seasonal_list,
-        'remainder': remainder_list,
-    }, index=data.index)
+    decomp = pd.DataFrame(
+        {
+            "trend": trend_list,
+            "seasonal": seasonal_list,
+            "remainder": remainder_list,
+        },
+        index=data.index,
+    )
 
     # Remove the seasonal component, and the median of the data to create the
     # univariate remainder
     residuals = [values[i] - seasonal_list[i] - data.value.median() for i in range(len(values))]
 
-    d = {
-        'timestamp': data.index,
-        'value': residuals
-    }
+    d = {"timestamp": data.index, "value": residuals}
     data = pd.DataFrame(d)
 
     p = {
-        'timestamp': decomp.index,
-        'value': pd.to_numeric((decomp['trend'] + decomp['seasonal']).truncate(), errors='coerce')
+        "timestamp": decomp.index,
+        "value": pd.to_numeric((decomp["trend"] + decomp["seasonal"]).truncate(), errors="coerce"),
     }
     data_decomp = pd.DataFrame(p)
 
@@ -118,12 +117,12 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
 
     if max_outliers == 0:
         raise ValueError(
-            "With longterm=TRUE, AnomalyDetection splits the data into 2 week periods by default. You have %d observations in a period, which is too few. Set a higher piecewise_median_period_weeks." %
-            num_obs)
+            "With longterm=TRUE, AnomalyDetection splits the data into 2 week periods by default. You have %d observations in a period, which is too few. Set a higher piecewise_median_period_weeks."
+            % num_obs
+        )
 
     # Use C extension for ESD test
-    anom_indices = c_esd_test(data.value.tolist(), max_outliers, alpha,
-                              one_tail, upper_tail)
+    anom_indices = c_esd_test(data.value.tolist(), max_outliers, alpha, one_tail, upper_tail)
 
     # Map 0-based indices back to DataFrame timestamp values
     if anom_indices:
@@ -132,7 +131,4 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
     else:
         R_idx = None
 
-    return {
-        'anoms': R_idx,
-        'stl': data_decomp
-    }
+    return {"anoms": R_idx, "stl": data_decomp}

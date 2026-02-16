@@ -10,9 +10,7 @@ def t_ppf(p: float, df: int) -> float:
     """Compute the percent-point function (inverse CDF) of Student's t-distribution."""
     ...
 
-def seasonal_decompose(
-    values: list[float], period: int
-) -> tuple[list[float], list[float], list[float]]:
+def seasonal_decompose(values: list[float], period: int) -> tuple[list[float], list[float], list[float]]:
     """Additive classical seasonal decomposition. Returns (trend, seasonal, remainder)."""
     ...
 
