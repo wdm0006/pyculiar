@@ -1,30 +1,52 @@
-from itertools import groupby
-from math import sqrt
+# MIT License
+#
+# Copyright (c) 2025 Will McGinnis
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
-from scipy.stats import t as student_t
-from statsmodels.robust.scale import mad
+from itertools import groupby
+
 import numpy as np
 import pandas as pd
 
-from pyculiarity.stl import stl
+from pyculiarity._cext.anomaly_module import seasonal_decompose as c_seasonal_decompose
+from pyculiarity._cext.anomaly_module import esd_test as c_esd_test
 
 
 def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
                  use_decomp=True, one_tail=True, upper_tail=True, verbose=False):
     """
-    # Detects anomalies in a time series using S-H-ESD.
-    #
-    # Args:
-    #	 data: Time series to perform anomaly detection on.
-    #	 k: Maximum number of anomalies that S-H-ESD will detect as a percentage of the data.
-    #	 alpha: The level of statistical significance with which to accept or reject anomalies.
-    #	 num_obs_per_period: Defines the number of observations in a single period, and used during seasonal decomposition.
-    #	 use_decomp: Use seasonal decomposition during anomaly detection.
-    #	 one_tail: If TRUE only positive or negative going anomalies are detected depending on if upper_tail is TRUE or FALSE.
-    #	 upper_tail: If TRUE and one_tail is also TRUE, detect only positive going (right-tailed) anomalies. If FALSE and one_tail is TRUE, only detect negative (left-tailed) anomalies.
-    #	 verbose: Additionally printing for debugging.
-    # Returns:
-    #   A dictionary containing the anomalies (anoms) and decomposition components (stl).
+    Detects anomalies in a time series using S-H-ESD.
+
+    Args:
+        data: Time series to perform anomaly detection on.
+        k: Maximum number of anomalies that S-H-ESD will detect as a percentage of the data.
+        alpha: The level of statistical significance with which to accept or reject anomalies.
+        num_obs_per_period: Defines the number of observations in a single period, and used during seasonal decomposition.
+        use_decomp: Use seasonal decomposition during anomaly detection.
+        one_tail: If TRUE only positive or negative going anomalies are detected depending on if upper_tail is TRUE or FALSE.
+        upper_tail: If TRUE and one_tail is also TRUE, detect only positive going (right-tailed) anomalies.
+                    If FALSE and one_tail is TRUE, only detect negative (left-tailed) anomalies.
+        verbose: Additionally printing for debugging.
+
+    Returns:
+        A dictionary containing the anomalies (anoms) and decomposition components (stl).
     """
 
     if num_obs_per_period is None:
@@ -50,7 +72,7 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
     else:
         data = data.dropna()
 
-    # -- Step 1: Decompose data. This returns a univarite remainder which will be used for anomaly detection. Optionally, we might NOT decompose.
+    # -- Step 1: Decompose data. This returns a univariate remainder which will be used for anomaly detection.
 
     data = data.set_index('timestamp')
 
@@ -65,13 +87,23 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
             raise ValueError('Unsupported resample period: %d' % num_obs_per_period)
         data = data.resample(resample_period).mean().dropna()
 
-    decomp = stl(data.value, period=num_obs_per_period)
+    # Use C extension for seasonal decomposition
+    values = data.value.tolist()
+    trend_list, seasonal_list, remainder_list = c_seasonal_decompose(values, num_obs_per_period)
+
+    decomp = pd.DataFrame({
+        'trend': trend_list,
+        'seasonal': seasonal_list,
+        'remainder': remainder_list,
+    }, index=data.index)
 
     # Remove the seasonal component, and the median of the data to create the
     # univariate remainder
+    residuals = [values[i] - seasonal_list[i] - data.value.median() for i in range(len(values))]
+
     d = {
         'timestamp': data.index,
-        'value': data.value - decomp['seasonal'] - data.value.median()
+        'value': residuals
     }
     data = pd.DataFrame(d)
 
@@ -89,51 +121,14 @@ def detect_anoms(data, k=0.49, alpha=0.05, num_obs_per_period=None,
             "With longterm=TRUE, AnomalyDetection splits the data into 2 week periods by default. You have %d observations in a period, which is too few. Set a higher piecewise_median_period_weeks." %
             num_obs)
 
-    # Define values and vectors.
-    n = len(data.timestamp)
-    R_idx = list(range(max_outliers))
+    # Use C extension for ESD test
+    anom_indices = c_esd_test(data.value.tolist(), max_outliers, alpha,
+                              one_tail, upper_tail)
 
-    num_anoms = 0
-
-    # Compute test statistic until r=max_outliers values have been
-    # removed from the sample.
-    for i in range(1, max_outliers + 1):
-        if one_tail:
-            if upper_tail:
-                ares = data.value - data.value.median()
-            else:
-                ares = data.value.median() - data.value
-        else:
-            ares = (data.value - data.value.median()).abs()
-
-        # protect against constant time series
-        data_sigma = mad(data.value)
-        if data_sigma == 0:
-            break
-
-        ares /= float(data_sigma)
-
-        R = ares.max()
-
-        temp_max_idx = ares[ares == R].index.tolist()[0]
-
-        R_idx[i - 1] = temp_max_idx
-
-        data = data[data.index != R_idx[i - 1]]
-
-        if one_tail:
-            p = 1 - alpha / float(n - i + 1)
-        else:
-            p = 1 - alpha / float(2 * (n - i + 1))
-
-        t = student_t.ppf(p, (n - i - 1))
-        lam = t * (n - i) / float(sqrt((n - i - 1 + t**2) * (n - i + 1)))
-
-        if R > lam:
-            num_anoms = i
-
-    if num_anoms > 0:
-        R_idx = R_idx[:num_anoms]
+    # Map 0-based indices back to DataFrame timestamp values
+    if anom_indices:
+        timestamps = data.timestamp.tolist()
+        R_idx = [timestamps[i] for i in anom_indices]
     else:
         R_idx = None
 
