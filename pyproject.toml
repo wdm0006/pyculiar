@@ -44,5 +44,12 @@ include = ["pyculiar*"]
 [tool.ruff]
 line-length = 120
 
+[tool.ruff.lint.per-file-ignores]
+# TRY004 would change public exception types (ValueError -> TypeError).
+"pyculiar/detect_ts.py" = ["TRY004"]
+"pyculiar/date_utils.py" = ["DTZ007"]
+"examples/*" = ["DTZ007"]
+"tests/*" = ["RUF012"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

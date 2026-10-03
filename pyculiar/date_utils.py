@@ -32,7 +32,7 @@ def get_gran(tsdf, index=0):
     col = tsdf.iloc[:, index]
 
     largest, second_largest = nlargest(2, col)
-    gran = int(round(largest - second_largest))
+    gran = round(largest - second_largest)
 
     if gran >= 86400:
         return "day"

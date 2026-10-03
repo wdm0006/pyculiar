@@ -7,12 +7,14 @@ so the C rewrite can be validated.
 import numpy as np
 import pytest
 
-from pyculiar._cext.anomaly_module import median as _c_median, mad as _c_mad, t_ppf as _c_t_ppf
-
+from pyculiar._cext.anomaly_module import mad as _c_mad
+from pyculiar._cext.anomaly_module import median as _c_median
+from pyculiar._cext.anomaly_module import t_ppf as _c_t_ppf
 
 # ---------------------------------------------------------------------------
 # Median tests
 # ---------------------------------------------------------------------------
+
 
 class TestMedian:
     def test_single_element(self):
@@ -61,6 +63,7 @@ class TestMedian:
 # MAD tests
 # ---------------------------------------------------------------------------
 
+
 class TestMAD:
     def test_1_to_5(self):
         result = _c_mad([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -105,6 +108,7 @@ class TestMAD:
 # ---------------------------------------------------------------------------
 # t_ppf tests
 # ---------------------------------------------------------------------------
+
 
 class TestTPPF:
     """Student's t inverse CDF (percent-point function)."""
@@ -178,8 +182,7 @@ class TestTPPF:
         result = _c_t_ppf(p, df)
         # Allow relative tolerance of 1e-6 for the C implementation
         rel_tol = abs(expected) * 1e-6
-        assert abs(result - expected) < max(rel_tol, 1e-9), \
-            f"t_ppf({p}, {df}): expected {expected}, got {result}"
+        assert abs(result - expected) < max(rel_tol, 1e-9), f"t_ppf({p}, {df}): expected {expected}, got {result}"
 
     def test_symmetry(self):
         """t_ppf(p, df) = -t_ppf(1-p, df) for symmetric t distribution."""
@@ -187,8 +190,7 @@ class TestTPPF:
             for p in [0.9, 0.95, 0.99]:
                 upper = _c_t_ppf(p, df)
                 lower = _c_t_ppf(1.0 - p, df)
-                assert abs(upper + lower) < 1e-8, \
-                    f"Symmetry failed for df={df}, p={p}"
+                assert abs(upper + lower) < 1e-8, f"Symmetry failed for df={df}, p={p}"
 
     def test_median_is_zero(self):
         """t_ppf(0.5, df) should be 0 for all df."""

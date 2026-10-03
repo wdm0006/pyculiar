@@ -3,7 +3,6 @@
 Locks in exact seasonal_decompose behavior using C extension.
 """
 
-import datetime
 import os
 
 import numpy as np
@@ -17,10 +16,8 @@ from pyculiar._cext.anomaly_module import seasonal_decompose
 def raw_values():
     """Load raw_data.csv and return as a list of floats."""
     path = os.path.dirname(os.path.realpath(__file__))
-    data = pd.read_csv(
-        os.path.join(path, 'raw_data.csv'),
-        usecols=['timestamp', 'count'])
-    return data['count'].tolist()
+    data = pd.read_csv(os.path.join(path, "raw_data.csv"), usecols=["timestamp", "count"])
+    return data["count"].tolist()
 
 
 @pytest.fixture
@@ -110,5 +107,4 @@ class TestAdditiveReconstruction:
         # Only check the middle section where trend is non-zero
         half_period = 1440 // 2
         mid = slice(half_period, -half_period)
-        np.testing.assert_allclose(
-            reconstructed[mid], original[mid], atol=1e-10)
+        np.testing.assert_allclose(reconstructed[mid], original[mid], atol=1e-10)

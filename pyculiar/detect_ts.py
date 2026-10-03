@@ -20,13 +20,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from collections import namedtuple
-import datetime
 import copy
+import datetime
+from collections import namedtuple
 
-from pandas import DataFrame, Timestamp
 import numpy as np
 import pandas as pd
+from pandas import DataFrame, Timestamp
 
 from pyculiar.detect_anoms import detect_anoms
 
@@ -113,18 +113,16 @@ def detect_ts(
     if max_anoms > 0.49:
         length = len(df.value)
         raise ValueError(
-            "max_anoms must be less than 50%% of the data points (max_anoms =%f data_points =%s)."
-            % (round(max_anoms * length, 0), length)
+            f"max_anoms must be less than 50% of the data points (max_anoms ={round(max_anoms * length, 0):f} data_points ={length})."
         )
 
     if direction not in ["pos", "neg", "both"]:
         raise ValueError("direction options are: pos | neg | both.")
 
-    if not (0.01 <= alpha or alpha <= 0.1):
-        if verbose:
-            import warnings
+    if not (0.01 <= alpha or alpha <= 0.1) and verbose:
+        import warnings
 
-            warnings.warn("alpha is the statistical signifigance, and is usually between 0.01 and 0.1")
+        warnings.warn("alpha is the statistical signifigance, and is usually between 0.01 and 0.1")
 
     if threshold not in [None, "med_max", "p95", "p99"]:
         raise ValueError("threshold options are: None | med_max | p95 | p99")
@@ -143,7 +141,7 @@ def detect_ts(
     gran_period = {"ms": 60000, "sec": 3600, "min": 1440, "hr": 24, "day": 7}
     period = gran_period.get(gran)
     if not period:
-        raise ValueError("%s granularity detected. This is currently not supported." % (gran,))
+        raise ValueError(f"{gran} granularity detected. This is currently not supported.")
 
     # now convert the timestamp column into a proper timestamp
     df["timestamp"] = df["timestamp"].map(lambda x: datetime.datetime.fromtimestamp(x, tz=datetime.timezone.utc))
@@ -151,8 +149,7 @@ def detect_ts(
     num_obs = len(df.value)
 
     clamp = 1 / float(num_obs)
-    if max_anoms < clamp:
-        max_anoms = clamp
+    max_anoms = max(max_anoms, clamp)
 
     if longterm:
         if gran == "day":
