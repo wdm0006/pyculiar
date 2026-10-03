@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -32,3 +33,25 @@ def test_both_directions_e_value_threshold_med_max(raw_data):
     )
     assert len(results["anoms"].columns) == 3
     assert len(results["anoms"].iloc[:, 1]) > 0
+
+
+@pytest.fixture
+def overlapping_windows_data():
+    rng = np.random.default_rng(1)
+    n = 24 * 45
+    timestamps = 1_699_999_200 + 3600 * np.arange(n)
+    values = 100 + 20 * np.sin(2 * np.pi * np.arange(n) / 24) + rng.normal(0, 2, n)
+    values[n - 20] += 80
+    return pd.DataFrame({"timestamp": timestamps, "value": values})
+
+
+@pytest.mark.parametrize("e_value", [False, True])
+def test_longterm_overlapping_windows_have_unique_anoms(overlapping_windows_data, e_value):
+    results = detect_ts(
+        overlapping_windows_data, max_anoms=0.05, direction="pos", longterm=True, e_value=e_value, granularity="hr"
+    )
+    anoms = results["anoms"]
+    assert anoms["timestamp"].is_unique
+    assert len(anoms) == 2
+    if e_value:
+        assert anoms["expected_value"].notna().all()
