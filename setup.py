@@ -1,10 +1,19 @@
+import sys
+
 from setuptools import Extension, setup
+
+if sys.platform == "win32":
+    extra_compile_args = ["/O2"]
+    libraries = []
+else:
+    extra_compile_args = ["-O3", "-std=c99"]
+    libraries = ["m"]
 
 anomaly_module = Extension(
     "pyculiar._cext.anomaly_module",
     sources=["pyculiar/_cext/anomaly_module.c"],
-    extra_compile_args=["-O3", "-std=c99"],
-    libraries=["m"],
+    extra_compile_args=extra_compile_args,
+    libraries=libraries,
 )
 
 if __name__ == "__main__":
