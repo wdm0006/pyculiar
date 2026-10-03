@@ -40,11 +40,11 @@ numeric values.
 from pyculiar import detect_ts
 import pandas as pd
 
-data = pd.read_csv('tests/raw_data.csv', usecols=['timestamp', 'count'])
-data['timestamp'] = pd.to_datetime(data['timestamp']).astype(int) // 10**9
+data = pd.read_csv("tests/raw_data.csv", usecols=["timestamp", "count"])
+data["timestamp"] = pd.to_datetime(data["timestamp"]).astype(int) // 10**9
 
-results = detect_ts(data, max_anoms=0.05, alpha=0.001, direction='both', granularity='min')
-print(results['anoms'])
+results = detect_ts(data, max_anoms=0.05, alpha=0.001, direction="both", granularity="min")
+print(results["anoms"])
 ```
 
 Parameters:

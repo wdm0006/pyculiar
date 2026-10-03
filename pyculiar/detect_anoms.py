@@ -25,8 +25,8 @@ from itertools import groupby
 import numpy as np
 import pandas as pd
 
-from pyculiar._cext.anomaly_module import seasonal_decompose as c_seasonal_decompose
 from pyculiar._cext.anomaly_module import esd_test as c_esd_test
+from pyculiar._cext.anomaly_module import seasonal_decompose as c_seasonal_decompose
 
 
 def detect_anoms(
@@ -65,10 +65,7 @@ def detect_anoms(
         return None
 
     # run length encode result of isnull, check for internal nulls
-    if (
-        len(list(x[0] for x in groupby(pd.isnull(pd.concat([pd.Series([np.nan]), data.value, pd.Series([np.nan])])))))
-        > 3
-    ):
+    if len([x[0] for x in groupby(pd.isnull(pd.concat([pd.Series([np.nan]), data.value, pd.Series([np.nan])])))]) > 3:
         raise ValueError(
             "Data contains non-leading NAs. We suggest replacing NAs with interpolated values (see na.approx in Zoo package)."
         )
@@ -83,7 +80,7 @@ def detect_anoms(
         resample_period = {1440: "min", 24: "h", 7: "D"}
         resample_period = resample_period.get(num_obs_per_period)
         if not resample_period:
-            raise ValueError("Unsupported resample period: %d" % num_obs_per_period)
+            raise ValueError(f"Unsupported resample period: {num_obs_per_period}")
         data = data.resample(resample_period).mean().dropna()
 
     # Use C extension for seasonal decomposition
@@ -117,8 +114,7 @@ def detect_anoms(
 
     if max_outliers == 0:
         raise ValueError(
-            "With longterm=TRUE, AnomalyDetection splits the data into 2 week periods by default. You have %d observations in a period, which is too few. Set a higher piecewise_median_period_weeks."
-            % num_obs
+            f"With longterm=TRUE, AnomalyDetection splits the data into 2 week periods by default. You have {num_obs} observations in a period, which is too few. Set a higher piecewise_median_period_weeks."
         )
 
     # Use C extension for ESD test

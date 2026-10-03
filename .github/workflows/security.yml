@@ -22,6 +22,9 @@ jobs:
           languages: python, c-cpp
           queries: security-and-quality
 
+      - name: Upgrade setuptools (PEP 639 license strings)
+        run: python -m pip install --upgrade "setuptools>=77"
+
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
