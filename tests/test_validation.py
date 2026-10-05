@@ -115,3 +115,54 @@ class TestDetectAnomsInputValidation:
         df.at[mid, "value"] = np.nan
         with pytest.raises(ValueError, match="non-leading NAs"):
             detect_anoms(df, k=0.02, alpha=0.05, num_obs_per_period=1440)
+
+
+# ---------------------------------------------------------------------------
+# detect_ts: validation must not mutate the caller's frame
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def hourly_df():
+    ts = np.arange(1008) * 3600 + 1_700_000_000 - (1_700_000_000 % 3600)
+    return pd.DataFrame({"t": ts, "v": np.sin(np.arange(1008) * 2 * np.pi / 24)})
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_anoms": 0.5},
+        {"direction": "up"},
+        {"alpha": float("nan")},
+        {"threshold": "p50"},
+        {"e_value": "yes"},
+        {"longterm": 1},
+        {"piecewise_median_period_weeks": 1},
+        {"granularity": "weekly"},
+    ],
+    ids=lambda k: next(iter(k)),
+)
+def test_invalid_argument_leaves_frame_untouched(hourly_df, kwargs):
+    kwargs.setdefault("granularity", "hr")
+    cols = list(hourly_df.columns)
+    dtypes = hourly_df.dtypes.copy()
+    with pytest.raises(ValueError):
+        detect_ts(hourly_df, **kwargs)
+    assert list(hourly_df.columns) == cols
+    assert hourly_df.dtypes.equals(dtypes)
+
+
+@pytest.mark.parametrize("alpha", [5, 0.001])
+def test_alpha_out_of_range_warns_when_verbose(hourly_df, alpha):
+    with pytest.warns(UserWarning, match="alpha"):
+        detect_ts(hourly_df.copy(), alpha=alpha, granularity="hr", verbose=True)
+
+
+def test_alpha_in_range_does_not_warn(hourly_df, recwarn):
+    detect_ts(hourly_df.copy(), alpha=0.05, granularity="hr", verbose=True)
+    assert not [w for w in recwarn if "alpha" in str(w.message)]
+
+
+def test_alpha_out_of_range_silent_when_not_verbose(hourly_df, recwarn):
+    detect_ts(hourly_df.copy(), alpha=5, granularity="hr")
+    assert not [w for w in recwarn if "alpha" in str(w.message)]

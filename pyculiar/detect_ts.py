@@ -22,6 +22,7 @@
 
 import copy
 import datetime
+import math
 from collections import namedtuple
 
 import numpy as np
@@ -102,16 +103,9 @@ def detect_ts(
             raise ValueError("""The input timestamp column must be a float or integer of the unix timestamp, not date
                                 time columns, date strings or pd.TimeStamp columns.""")
 
-    if not inplace:
-        df = copy.deepcopy(df)
-
-    # change the column names in place, rather than copying the entire dataset, but save the headers to replace them.
-    orig_header = df.columns.values
-    df.rename(columns={df.columns.values[0]: "timestamp", df.columns.values[1]: "value"}, inplace=True)
-
     # Sanity check all input parameters
     if max_anoms > 0.49:
-        length = len(df.value)
+        length = len(df)
         raise ValueError(
             f"max_anoms must be less than 50% of the data points (max_anoms ={round(max_anoms * length, 0):f} data_points ={length})."
         )
@@ -119,7 +113,10 @@ def detect_ts(
     if direction not in ["pos", "neg", "both"]:
         raise ValueError("direction options are: pos | neg | both.")
 
-    if not (0.01 <= alpha or alpha <= 0.1) and verbose:
+    if not math.isfinite(alpha):
+        raise ValueError("alpha must be a finite number.")
+
+    if not (0.01 <= alpha <= 0.1) and verbose:
         import warnings
 
         warnings.warn("alpha is the statistical signifigance, and is usually between 0.01 and 0.1")
@@ -142,6 +139,13 @@ def detect_ts(
     period = gran_period.get(gran)
     if not period:
         raise ValueError(f"{gran} granularity detected. This is currently not supported.")
+
+    if not inplace:
+        df = copy.deepcopy(df)
+
+    # change the column names in place, rather than copying the entire dataset, but save the headers to replace them.
+    orig_header = df.columns.values
+    df.rename(columns={df.columns.values[0]: "timestamp", df.columns.values[1]: "value"}, inplace=True)
 
     # now convert the timestamp column into a proper timestamp
     df["timestamp"] = df["timestamp"].map(lambda x: datetime.datetime.fromtimestamp(x, tz=datetime.timezone.utc))
