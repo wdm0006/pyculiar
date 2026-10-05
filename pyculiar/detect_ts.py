@@ -24,6 +24,7 @@ import copy
 import datetime
 import math
 from collections import namedtuple
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -35,18 +36,18 @@ Direction = namedtuple("Direction", ["one_tail", "upper_tail"])
 
 
 def detect_ts(
-    df,
-    max_anoms=0.10,
-    direction="pos",
-    alpha=0.05,
-    threshold=None,
-    e_value=False,
-    longterm=False,
-    piecewise_median_period_weeks=2,
-    granularity="day",
-    verbose=False,
-    inplace=True,
-):
+    df: DataFrame,
+    max_anoms: float = 0.10,
+    direction: Literal["pos", "neg", "both"] = "pos",
+    alpha: float = 0.05,
+    threshold: Literal["med_max", "p95", "p99"] | None = None,
+    e_value: bool = False,
+    longterm: bool = False,
+    piecewise_median_period_weeks: int = 2,
+    granularity: Literal["ms", "sec", "min", "hr", "day"] = "day",
+    verbose: bool = False,
+    inplace: bool = True,
+) -> dict[str, DataFrame]:
     """
     Anomaly Detection Using Seasonal Hybrid ESD Test
     A technique for detecting anomalies in seasonal univariate time series where the input is a
@@ -225,11 +226,11 @@ def detect_ts(
             # Calculate the threshold set by the user
             thresh = 0.5
             if threshold == "med_max":
-                thresh = periodic_maxes.median()
+                thresh = float(periodic_maxes.median())
             elif threshold == "p95":
-                thresh = periodic_maxes.quantile(0.95)
+                thresh = float(periodic_maxes.quantile(0.95))
             elif threshold == "p99":
-                thresh = periodic_maxes.quantile(0.99)
+                thresh = float(periodic_maxes.quantile(0.99))
 
             # Remove any anoms below the threshold
             anoms = anoms[anoms.value >= thresh]
@@ -248,7 +249,7 @@ def detect_ts(
     df.rename(columns={"timestamp": orig_header[0], "value": orig_header[1]}, inplace=True)
 
     if anom_pct == 0:
-        return {"anoms": None}
+        return {"anoms": None}  # type: ignore[dict-item]  # unreachable for non-empty input
 
     all_anoms.index = all_anoms.timestamp
 

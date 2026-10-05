@@ -53,3 +53,29 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ -v
+
+  typing:
+    name: Typing marker & mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel
+        run: |
+          pip install build mypy pandas-stubs
+          python -m build --wheel
+
+      - name: Assert typing files are in the wheel
+        run: |
+          unzip -l dist/*.whl | grep -E "pyculiar/py\.typed$"
+          unzip -l dist/*.whl | grep -E "pyculiar/_cext/anomaly_module\.pyi$"
+
+      - name: Run mypy
+        run: |
+          pip install dist/*.whl
+          mypy -p pyculiar
