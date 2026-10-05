@@ -46,49 +46,43 @@ def detect_ts(
     verbose=False,
     inplace=True,
 ):
-    """
-    Anomaly Detection Using Seasonal Hybrid ESD Test
-    A technique for detecting anomalies in seasonal univariate time series where the input is a
-    series of <timestamp, value> pairs.
+    """Detect anomalies in a seasonal univariate time series using S-H-ESD.
 
     Args:
+        df: Nonempty two-column DataFrame: Unix timestamps (int64 or float64)
+            followed by numeric observations. Timestamps are always Unix seconds.
+        max_anoms: Maximum anomaly fraction, default 0.10; must be at most 0.49.
+            Clamped to at least one observation divided by the input length.
+        direction: Anomaly direction: "pos", "neg", or "both". Defaults to "pos".
+        alpha: Statistical significance level for accepting anomalies. Defaults
+            to 0.05; the usual range is 0.01 to 0.1.
+        threshold: Optional minimum observed value based on daily maxima:
+            "med_max" (median), "p95", or "p99". Defaults to None.
+        e_value: Include expected values at anomaly timestamps. Defaults to False.
+        longterm: Process the series in piecewise windows, recommended for series
+            longer than a month. Defaults to False.
+        piecewise_median_period_weeks: Window size in weeks for longterm processing.
+            Must be at least 2. Defaults to 2.
+        granularity: Observation spacing: "ms", "sec", "min", "hr", or "day".
+            Defaults to "day". Only "min", "hr", and "day" work end-to-end with
+            datetime resampling. Input timestamps use Unix seconds regardless
+            of this label.
+        verbose: Pass verbosity to the detector and enable available warnings.
+            Defaults to False.
+        inplace: Mutate the input frame when True (default), including converting
+            timestamps to UTC datetimes. Column names are restored on normal
+            completion. False processes a deep copy instead.
 
-    x: Time series as a two column data frame where the first column consists of the integer UTC Unix
-    timestamps and the second column consists of the observations.
+    Returns:
+        A dictionary with an "anoms" DataFrame containing "timestamp" (Unix
+        seconds) and "anoms" (observed values). With e_value=True, it also contains
+        "expected_value" (trend plus seasonal component). No detections produce
+        an empty frame. Insufficient data produces an empty frame with only
+        "timestamp" and "anoms", even when e_value=True.
 
-    max_anoms: Maximum number of anomalies that S-H-ESD will detect as a percentage of the
-    data.
-
-    direction: Directionality of the anomalies to be detected. Options are: ('pos' | 'neg' | 'both').
-
-    alpha: The level of statistical significance with which to accept or reject anomalies.
-
-    only_last: Find and report anomalies only within the last day or hr in the time series. Options: (None | 'day' | 'hr')
-
-    threshold: Only report positive going anoms above the threshold specified. Options are: (None | 'med_max' | 'p95' | 'p99')
-
-    e_value: Add an additional column to the anoms output containing the expected value.
-
-    longterm: Increase anom detection efficacy for time series that are greater than a month.
-
-    See Details below.
-    piecewise_median_period_weeks: The piecewise median time window as described in Vallis, Hochenbaum, and Kejariwal
-    (2014). Defaults to 2.
-
-    Details
-
-
-    'longterm' This option should be set when the input time series is longer than a month.
-    The option enables the approach described in Vallis, Hochenbaum, and Kejariwal (2014).
-    'threshold' Filter all negative anomalies and those anomalies whose magnitude is smaller
-    than one of the specified thresholds which include: the median
-    of the daily max values (med_max), the 95th percentile of the daily max values (p95), and the
-    99th percentile of the daily max values (p99).
-
-    The returned value is a dictionary with the following components:
-      anoms: Data frame containing timestamps, values, and optionally expected values.
-      plot: A graphical object if plotting was requested by the user. The plot contains
-      the estimated anomalies annotated on the input time series
+    Raises:
+        ValueError: If the input is empty, has an invalid shape or timestamp/value
+            types, or an option fails validation.
     """
 
     if not isinstance(df, DataFrame):
@@ -101,6 +95,9 @@ def detect_ts(
         if df.dtypes.iloc[0].type is not np.float64 and df.dtypes.iloc[0].type is not np.int64:
             raise ValueError("""The input timestamp column must be a float or integer of the unix timestamp, not date
                                 time columns, date strings or pd.TimeStamp columns.""")
+
+    if len(df) == 0:
+        raise ValueError("data must contain at least one row")
 
     if not inplace:
         df = copy.deepcopy(df)
