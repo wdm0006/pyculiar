@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 from itertools import groupby
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -30,8 +31,15 @@ from pyculiar._cext.anomaly_module import seasonal_decompose as c_seasonal_decom
 
 
 def detect_anoms(
-    data, k=0.49, alpha=0.05, num_obs_per_period=None, use_decomp=True, one_tail=True, upper_tail=True, verbose=False
-):
+    data: pd.DataFrame,
+    k: float = 0.49,
+    alpha: float = 0.05,
+    num_obs_per_period: int | None = None,
+    use_decomp: bool = True,
+    one_tail: bool = True,
+    upper_tail: bool = True,
+    verbose: bool = False,
+) -> dict[str, Any] | None:
     """
     Detects anomalies in a time series using S-H-ESD.
 
@@ -77,8 +85,8 @@ def detect_anoms(
     data = data.set_index("timestamp")
 
     if not pd.api.types.is_integer_dtype(data.index):
-        resample_period = {1440: "min", 24: "h", 7: "D"}
-        resample_period = resample_period.get(num_obs_per_period)
+        resample_periods = {1440: "min", 24: "h", 7: "D"}
+        resample_period = resample_periods.get(num_obs_per_period)
         if not resample_period:
             raise ValueError(f"Unsupported resample period: {num_obs_per_period}")
         data = data.resample(resample_period).mean().dropna()

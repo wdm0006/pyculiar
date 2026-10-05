@@ -39,6 +39,7 @@ Homepage = "https://github.com/wdm0006/pyculiar"
 include = ["pyculiar*"]
 
 [tool.setuptools.package-data]
+pyculiar = ["py.typed"]
 "pyculiar._cext" = ["*.c", "*.pyi"]
 
 [tool.ruff]
