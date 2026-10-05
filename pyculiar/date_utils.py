@@ -23,12 +23,14 @@
 from datetime import datetime
 from heapq import nlargest
 
+import pandas as pd
 
-def date_format(column, format):
+
+def date_format(column: pd.Series, format: str) -> pd.Series:
     return column.map(lambda datestring: datetime.strptime(datestring, format))
 
 
-def get_gran(tsdf, index=0):
+def get_gran(tsdf: pd.DataFrame, index: int = 0) -> str:
     col = tsdf.iloc[:, index]
 
     largest, second_largest = nlargest(2, col)
