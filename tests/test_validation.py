@@ -4,7 +4,9 @@ Tests all error paths to ensure consistent error handling after the C rewrite.
 """
 
 import datetime
+import inspect
 import os
+import re
 
 import numpy as np
 import pandas as pd
@@ -39,6 +41,20 @@ def raw_data_df():
 
 
 class TestDetectTsInputValidation:
+    @pytest.mark.parametrize("inplace", [True, False])
+    def test_empty_input(self, inplace):
+        df = pd.DataFrame({"time": pd.Series(dtype="int64"), "count": pd.Series(dtype="float64")})
+        before = df.copy(deep=True)
+        with pytest.raises(ValueError, match="^data must contain at least one row$"):
+            detect_ts(df, inplace=inplace)
+        pd.testing.assert_frame_equal(df, before)
+
+    def test_documented_arguments_match_signature(self):
+        doc = inspect.getdoc(detect_ts)
+        args = doc.split("Args:\n", 1)[1].split("\nReturns:", 1)[0]
+        names = re.findall(r"^    (\w+):", args, flags=re.MULTILINE)
+        assert names == list(inspect.signature(detect_ts).parameters)
+
     def test_non_dataframe_input(self):
         with pytest.raises(ValueError, match="data must be a single data frame"):
             detect_ts([1, 2, 3])
