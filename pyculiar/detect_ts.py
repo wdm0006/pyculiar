@@ -44,7 +44,7 @@ def detect_ts(
     e_value: bool = False,
     longterm: bool = False,
     piecewise_median_period_weeks: int = 2,
-    granularity: Literal["ms", "sec", "min", "hr", "day"] = "day",
+    granularity: Literal["sec", "min", "hr", "day"] = "day",
     verbose: bool = False,
     inplace: bool = True,
 ) -> dict[str, DataFrame]:
@@ -65,10 +65,9 @@ def detect_ts(
             longer than a month. Defaults to False.
         piecewise_median_period_weeks: Window size in weeks for longterm processing.
             Must be at least 2. Defaults to 2.
-        granularity: Observation spacing: "ms", "sec", "min", "hr", or "day".
-            Defaults to "day". Only "min", "hr", and "day" work end-to-end with
-            datetime resampling. Input timestamps use Unix seconds regardless
-            of this label.
+        granularity: Observation spacing: "sec", "min", "hr", or "day".
+            Defaults to "day". Millisecond data is not supported because input
+            timestamps are Unix seconds.
         verbose: Pass verbosity to the detector and enable available warnings.
             Defaults to False.
         inplace: Mutate the input frame when True (default), including converting
@@ -133,10 +132,10 @@ def detect_ts(
 
     # if the data is daily, then we need to bump the period to weekly to get multiple examples
     gran = granularity
-    gran_period = {"ms": 60000, "sec": 3600, "min": 1440, "hr": 24, "day": 7}
+    gran_period = {"sec": 3600, "min": 1440, "hr": 24, "day": 7}
     period = gran_period.get(gran)
     if not period:
-        raise ValueError(f"{gran} granularity detected. This is currently not supported.")
+        raise ValueError(f"granularity {gran!r} is not supported. Supported values: sec, min, hr, day.")
 
     if not inplace:
         df = copy.deepcopy(df)
