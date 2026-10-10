@@ -52,7 +52,7 @@ Parameters:
 - `max_anoms`: Maximum anomalies as a fraction of data (0.0 - 0.49)
 - `direction`: `'pos'`, `'neg'`, or `'both'`
 - `alpha`: Statistical significance level (typically 0.01 - 0.1)
-- `granularity`: `'day'`, `'hr'`, `'min'`, `'sec'`, or `'ms'`
+- `granularity`: `'day'`, `'hr'`, `'min'`, or `'sec'` (timestamps are Unix seconds, so millisecond data is not supported)
 - `threshold`: Optional filtering — `None`, `'med_max'`, `'p95'`, or `'p99'`
 - `e_value`: Include expected values in output (bool)
 - `longterm`: Enable piecewise processing for series > 1 month (bool)

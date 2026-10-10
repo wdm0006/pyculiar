@@ -85,7 +85,7 @@ def detect_anoms(
     data = data.set_index("timestamp")
 
     if not pd.api.types.is_integer_dtype(data.index):
-        resample_periods = {1440: "min", 24: "h", 7: "D"}
+        resample_periods = {3600: "s", 1440: "min", 24: "h", 7: "D"}
         resample_period = resample_periods.get(num_obs_per_period)
         if not resample_period:
             raise ValueError(f"Unsupported resample period: {num_obs_per_period}")
