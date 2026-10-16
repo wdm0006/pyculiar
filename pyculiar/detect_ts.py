@@ -51,8 +51,10 @@ def detect_ts(
     """Detect anomalies in a seasonal univariate time series using S-H-ESD.
 
     Args:
-        df: Nonempty two-column DataFrame: Unix timestamps (int64 or float64)
-            followed by numeric observations. Timestamps are always Unix seconds.
+        df: Nonempty two-column DataFrame: timestamps followed by numeric
+            observations. Timestamps are Unix seconds (int64 or float64) or a
+            datetime64 column; naive datetimes are treated as UTC and tz-aware
+            ones are converted to UTC. Strings are rejected.
         max_anoms: Maximum anomaly fraction, default 0.10; must be at most 0.49.
             Clamped to at least one observation divided by the input length.
         direction: Anomaly direction: "pos", "neg", or "both". Defaults to "pos".
@@ -93,9 +95,12 @@ def detect_ts(
             raise ValueError("""data must be a 2 column data.frame, with the first column being a set of timestamps, and
                                 the second coloumn being numeric values.""")
 
-        if df.dtypes.iloc[0].type is not np.float64 and df.dtypes.iloc[0].type is not np.int64:
-            raise ValueError("""The input timestamp column must be a float or integer of the unix timestamp, not date
-                                time columns, date strings or pd.TimeStamp columns.""")
+        is_datetime = pd.api.types.is_datetime64_any_dtype(df.dtypes.iloc[0])
+        if not is_datetime and df.dtypes.iloc[0].type is not np.float64 and df.dtypes.iloc[0].type is not np.int64:
+            raise ValueError("""The input timestamp column must be a datetime64 column or a float or integer of the
+                                unix timestamp, not date strings or object columns.""")
+        if is_datetime and df.iloc[:, 0].isna().any():
+            raise ValueError("The input timestamp column must not contain NaT values.")
 
     if len(df) == 0:
         raise ValueError("data must contain at least one row")
@@ -143,6 +148,11 @@ def detect_ts(
     # change the column names in place, rather than copying the entire dataset, but save the headers to replace them.
     orig_header = df.columns.values
     df.rename(columns={df.columns.values[0]: "timestamp", df.columns.values[1]: "value"}, inplace=True)
+
+    if is_datetime:
+        ts = df["timestamp"]
+        ts = ts.dt.tz_localize("UTC") if ts.dt.tz is None else ts.dt.tz_convert("UTC")
+        df["timestamp"] = (ts - pd.Timestamp(0, tz="UTC")) / pd.Timedelta(seconds=1)
 
     # now convert the timestamp column into a proper timestamp
     df["timestamp"] = df["timestamp"].map(lambda x: datetime.datetime.fromtimestamp(x, tz=datetime.timezone.utc))

@@ -33,8 +33,10 @@ For development:
 Usage
 -----
 
-The main entry point is `detect_ts`, which expects a two-column Pandas DataFrame with integer Unix timestamps and
-numeric values.
+The main entry point is `detect_ts`, which expects a two-column Pandas DataFrame with timestamps and
+numeric values. Timestamps may be Unix seconds (int64/float64) or a `datetime64` column
+(naive values are treated as UTC, tz-aware values are converted to UTC); strings are rejected.
+Output timestamps are always Unix seconds.
 
 ```python
 from pyculiar import detect_ts
