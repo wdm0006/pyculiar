@@ -55,6 +55,7 @@ Parameters:
 - `granularity`: `'day'`, `'hr'`, `'min'`, or `'sec'` (timestamps are Unix seconds, so millisecond data is not supported)
 - `threshold`: Optional filtering — `None`, `'med_max'`, `'p95'`, or `'p99'`
 - `e_value`: Include expected values in output (bool)
+- `return_details`: Add `direction` (`pos`/`neg`, sign of the tested residual) and `residual` (observation - seasonal - median, the value ESD tested) columns (bool, default False)
 - `longterm`: Enable piecewise processing for series > 1 month (bool)
 
 Run the tests

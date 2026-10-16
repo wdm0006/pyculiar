@@ -47,6 +47,7 @@ def detect_ts(
     granularity: Literal["sec", "min", "hr", "day"] = "day",
     verbose: bool = False,
     inplace: bool = True,
+    return_details: bool = False,
 ) -> dict[str, DataFrame]:
     """Detect anomalies in a seasonal univariate time series using S-H-ESD.
 
@@ -73,11 +74,15 @@ def detect_ts(
         inplace: Mutate the input frame when True (default), including converting
             timestamps to UTC datetimes. Column names are restored on normal
             completion. False processes a deep copy instead.
+        return_details: Add "direction" ("pos" or "neg", the sign of the tested
+            residual) and "residual" (observation minus seasonal component minus
+            series median, the value ESD tested) columns. Defaults to False.
 
     Returns:
         A dictionary with an "anoms" DataFrame containing "timestamp" (Unix
         seconds) and "anoms" (observed values). With e_value=True, it also contains
-        "expected_value" (trend plus seasonal component). No detections produce
+        "expected_value" (trend plus seasonal component). With return_details=True,
+        "direction" and "residual" are appended. No detections produce
         an empty frame. Insufficient data produces an empty frame with only
         "timestamp" and "anoms", even when e_value=True.
 
@@ -126,6 +131,9 @@ def detect_ts(
 
     if not isinstance(longterm, bool):
         raise ValueError("longterm must be a boolean")
+
+    if not isinstance(return_details, bool):
+        raise ValueError("return_details must be a boolean")
 
     if piecewise_median_period_weeks < 2:
         raise ValueError("piecewise_median_period_weeks must be at greater than 2 weeks")
@@ -180,7 +188,7 @@ def detect_ts(
     else:
         all_data = [df]
 
-    all_anoms = DataFrame(columns=["timestamp", "value"])
+    all_anoms = DataFrame(columns=["timestamp", "value", "residual"])
     seasonal_plus_trend = DataFrame(columns=["timestamp", "value"])
 
     # Detect anomalies on all data (either entire data in one-pass, or in 2 week blocks if longterm=TRUE)
@@ -206,13 +214,15 @@ def detect_ts(
 
         # store decomposed comps in local variable and overwrite s_h_esd_timestamps to contain only the anom timestamps
         data_decomp = s_h_esd_timestamps["stl"]
+        residual_by_ts = dict(zip(s_h_esd_timestamps["anoms"] or [], s_h_esd_timestamps["residuals"] or []))
         s_h_esd_timestamps = s_h_esd_timestamps["anoms"]
 
         # -- Step 3: Use detected anomaly timestamps to extract the actual anomalies (timestamp and value) from the data
         if s_h_esd_timestamps:
-            anoms = all_data[i][all_data[i].timestamp.isin(s_h_esd_timestamps)]
+            anoms = all_data[i][all_data[i].timestamp.isin(s_h_esd_timestamps)].copy()
+            anoms["residual"] = anoms.timestamp.map(residual_by_ts)
         else:
-            anoms = DataFrame(columns=["timestamp", "value"])
+            anoms = DataFrame(columns=["timestamp", "value", "residual"])
 
         # Filter the anomalies using one of the thresholding functions if applicable
         if threshold:
@@ -257,6 +267,10 @@ def detect_ts(
         }
     else:
         d = {"timestamp": all_anoms.timestamp, "anoms": all_anoms.value}
+
+    if return_details:
+        d["direction"] = all_anoms.residual.map(lambda r: "pos" if r >= 0 else "neg")
+        d["residual"] = all_anoms.residual.astype(float)
 
     anoms = DataFrame(d, index=d["timestamp"].index)
 

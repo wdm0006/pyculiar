@@ -55,7 +55,8 @@ def detect_anoms(
         verbose: Additionally printing for debugging.
 
     Returns:
-        A dictionary containing the anomalies (anoms) and decomposition components (stl).
+        A dictionary containing the anomalies (anoms), decomposition components (stl), and
+        the tested residual for each anomaly (residuals, aligned with anoms; None if no anomalies).
     """
 
     if num_obs_per_period is None:
@@ -132,7 +133,9 @@ def detect_anoms(
     if anom_indices:
         timestamps = data.timestamp.tolist()
         R_idx = [timestamps[i] for i in anom_indices]
+        R_res = [residuals[i] for i in anom_indices]
     else:
         R_idx = None
+        R_res = None
 
-    return {"anoms": R_idx, "stl": data_decomp}
+    return {"anoms": R_idx, "stl": data_decomp, "residuals": R_res}
