@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 from itertools import groupby
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -39,6 +39,7 @@ def detect_anoms(
     one_tail: bool = True,
     upper_tail: bool = True,
     verbose: bool = False,
+    fill_missing: Literal["linear"] | None = None,
 ) -> dict[str, Any] | None:
     """
     Detects anomalies in a time series using S-H-ESD.
@@ -53,6 +54,7 @@ def detect_anoms(
         upper_tail: If TRUE and one_tail is also TRUE, detect only positive going (right-tailed) anomalies.
                     If FALSE and one_tail is TRUE, only detect negative (left-tailed) anomalies.
         verbose: Additionally printing for debugging.
+        fill_missing: None raises on interior NAs; "linear" interpolates them before decomposition.
 
     Returns:
         A dictionary containing the anomalies (anoms), decomposition components (stl), and
@@ -61,6 +63,9 @@ def detect_anoms(
 
     if num_obs_per_period is None:
         raise ValueError("must supply period length for time series decomposition")
+
+    if fill_missing not in (None, "linear"):
+        raise ValueError("fill_missing options are: None | linear.")
 
     if list(data.columns.values) != ["timestamp", "value"]:
         data.columns = ["timestamp", "value"]
@@ -74,12 +79,19 @@ def detect_anoms(
         return None
 
     # run length encode result of isnull, check for internal nulls
-    if len([x[0] for x in groupby(pd.isnull(pd.concat([pd.Series([np.nan]), data.value, pd.Series([np.nan])])))]) > 3:
+    has_interior_nas = (
+        len([x[0] for x in groupby(pd.isnull(pd.concat([pd.Series([np.nan]), data.value, pd.Series([np.nan])])))]) > 3
+    )
+    if has_interior_nas and fill_missing is None:
         raise ValueError(
-            "Data contains non-leading NAs. We suggest replacing NAs with interpolated values (see na.approx in Zoo package)."
+            "Data contains non-leading NAs. Pass fill_missing='linear' to interpolate them, "
+            "or fill or drop them before calling."
         )
-    else:
-        data = data.dropna()
+    data = data.dropna(subset=["value"]) if not has_interior_nas else data
+    if has_interior_nas:
+        first, last = data.value.first_valid_index(), data.value.last_valid_index()
+        data = data.loc[first:last].copy()
+        data["value"] = data.value.astype(float).interpolate(method="linear")
 
     # -- Step 1: Decompose data. This returns a univariate remainder which will be used for anomaly detection.
 

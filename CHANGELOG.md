@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `detect_ts(fill_missing="linear")` (also accepted by `detect_anoms`) interpolates interior NaN observations before decomposition. The default `None` keeps raising `ValueError`. Interpolated timestamps are never reported as anomalies.
+
 ### Changed
+
+- The interior-NaN error message now points at `fill_missing` instead of the R `zoo` package.
 
 - `detect_ts(granularity="sec")` now works end-to-end (per-second data is resampled to seconds).
 - `detect_ts(granularity="ms")` raises `ValueError` up front, before the input frame is touched. Timestamps are Unix seconds, so millisecond spacing cannot be represented; previously long input failed deep in the core and short input silently returned no anomalies.
