@@ -258,14 +258,8 @@ def detect_ts(
     all_anoms = all_anoms.drop_duplicates(subset=["timestamp"])
     seasonal_plus_trend = seasonal_plus_trend.drop_duplicates(subset=["timestamp"])
 
-    # Calculate number of anomalies as a percentage
-    anom_pct = (len(df.value) / float(num_obs)) * 100
-
     # name the columns back
     df.rename(columns={"timestamp": orig_header[0], "value": orig_header[1]}, inplace=True)
-
-    if anom_pct == 0:
-        return {"anoms": None}  # type: ignore[dict-item]  # unreachable for non-empty input
 
     all_anoms.index = all_anoms.timestamp
 
