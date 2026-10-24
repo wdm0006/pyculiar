@@ -48,6 +48,7 @@ def detect_ts(
     verbose: bool = False,
     inplace: bool = True,
     return_details: bool = False,
+    fill_missing: Literal["linear"] | None = None,
 ) -> dict[str, DataFrame]:
     """Detect anomalies in a seasonal univariate time series using S-H-ESD.
 
@@ -79,6 +80,10 @@ def detect_ts(
         return_details: Add "direction" ("pos" or "neg", the sign of the tested
             residual) and "residual" (observation minus seasonal component minus
             series median, the value ESD tested) columns. Defaults to False.
+        fill_missing: How to treat NaN observations between the first and last
+            valid ones. None (default) raises ValueError; "linear" interpolates
+            them before decomposition. Leading and trailing NaNs are always
+            dropped, and interpolated timestamps are never reported as anomalies.
 
     Returns:
         A dictionary with an "anoms" DataFrame containing "timestamp" (Unix
@@ -139,6 +144,9 @@ def detect_ts(
 
     if not isinstance(return_details, bool):
         raise ValueError("return_details must be a boolean")
+
+    if fill_missing not in (None, "linear"):
+        raise ValueError("fill_missing options are: None | linear.")
 
     if piecewise_median_period_weeks < 2:
         raise ValueError("piecewise_median_period_weeks must be at greater than 2 weeks")
@@ -218,6 +226,7 @@ def detect_ts(
             one_tail=anomaly_direction.one_tail,
             upper_tail=anomaly_direction.upper_tail,
             verbose=verbose,
+            fill_missing=fill_missing,
         )
         if s_h_esd_timestamps is None:
             return {"anoms": DataFrame(columns=["timestamp", "anoms"])}
@@ -230,6 +239,7 @@ def detect_ts(
         # -- Step 3: Use detected anomaly timestamps to extract the actual anomalies (timestamp and value) from the data
         if s_h_esd_timestamps:
             anoms = all_data[i][all_data[i].timestamp.isin(s_h_esd_timestamps)].copy()
+            anoms = anoms[anoms.value.notna()]
             anoms["residual"] = anoms.timestamp.map(residual_by_ts)
         else:
             anoms = DataFrame(columns=["timestamp", "value", "residual"])

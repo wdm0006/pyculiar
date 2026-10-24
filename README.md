@@ -58,6 +58,7 @@ Parameters:
 - `threshold`: Optional filtering — `None`, `'med_max'`, `'p95'`, or `'p99'`
 - `e_value`: Include expected values in output (bool)
 - `return_details`: Add `direction` (`pos`/`neg`, sign of the tested residual) and `residual` (observation - seasonal - median, the value ESD tested) columns (bool, default False)
+- `fill_missing`: `None` (default) raises `ValueError` on NaNs between valid observations; `'linear'` interpolates them before decomposition. Leading/trailing NaNs are always dropped, and interpolated timestamps are never reported as anomalies
 - `longterm`: Enable piecewise processing for series > 1 month (bool)
 
 Run the tests
