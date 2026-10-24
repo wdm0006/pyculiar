@@ -7,6 +7,22 @@ import pytest
 from pyculiar import detect_ts
 
 
+@pytest.mark.parametrize("e_value", [False, True])
+@pytest.mark.parametrize("return_details", [False, True])
+def test_zero_detections_return_empty_dataframe(e_value, return_details):
+    df = pd.DataFrame({"timestamp": 1_699_999_200 + 3600 * np.arange(24 * 14), "value": 100.0})
+    anoms = detect_ts(df, granularity="hr", e_value=e_value, return_details=return_details)["anoms"]
+
+    assert isinstance(anoms, pd.DataFrame)
+    assert anoms.empty
+    columns = ["timestamp", "anoms"]
+    if e_value:
+        columns.append("expected_value")
+    if return_details:
+        columns.extend(["direction", "residual"])
+    assert list(anoms.columns) == columns
+
+
 @pytest.fixture
 def raw_data():
     path = os.path.dirname(os.path.realpath(__file__))
