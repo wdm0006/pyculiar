@@ -40,7 +40,8 @@ def _gappy(gap):
     v = 100 + 10 * np.sin(2 * np.pi * np.arange(n) / 24) + rng.normal(0, 0.5, n)
     for s in SPIKES:
         v[s] += 80
-    v[list(gap)] = np.nan
+    for i in gap:
+        v[i] = np.nan
     return pd.DataFrame({"t": START + 3600 * np.arange(n, dtype="int64"), "v": v})
 
 
