@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyculiar"
-version = "0.2.0"
+version = "0.3.0"
 description = "Anomaly detection for time series using S-H-ESD, with a C extension for performance."
 readme = "README.md"
 license = "MIT"

@@ -5,18 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-10-25
 
 ### Added
 
-- `detect_ts(fill_missing="linear")` (also accepted by `detect_anoms`) interpolates interior NaN observations before decomposition. The default `None` keeps raising `ValueError`. Interpolated timestamps are never reported as anomalies.
+- Accept datetime64 timestamp columns in `detect_ts`: naive datetimes mean UTC,
+  timezone-aware datetimes convert to UTC, and output timestamps remain Unix seconds (#17).
+- Opt into per-anomaly `direction` and tested `residual` columns with
+  `detect_ts(return_details=True)` (#16).
+- Interpolate interior NaN observations before decomposition with
+  `fill_missing="linear"` in `detect_ts` or `detect_anoms`. The default still
+  raises `ValueError`; interpolated observations are never reported as anomalies (#21).
+- Support `detect_ts(granularity="sec")` end-to-end (#13).
+- Ship PEP 561 typing information (`py.typed`) and Python API annotations (#9).
+
+### Fixed
+
+- Deduplicate anomalies and expected values from overlapping longterm windows (#5).
+- Validate options before renaming caller-owned columns, reject non-finite alpha,
+  and restore the verbose warning for alpha outside the usual range (#11).
+- Reject empty input with a clear `ValueError` (#10).
 
 ### Changed
 
-- The interior-NaN error message now points at `fill_missing` instead of the R `zoo` package.
+- Reject `granularity="ms"` before mutating input, rather than failing later or
+  silently returning no anomalies. **Migration:** resample millisecond data to
+  a supported granularity (`sec`, `min`, `hr`, or `day`) before detection (#13).
+- Interior-NaN errors now explain the `fill_missing` option (#21).
 
-- `detect_ts(granularity="sec")` now works end-to-end (per-second data is resampled to seconds).
-- `detect_ts(granularity="ms")` raises `ValueError` up front, before the input frame is touched. Timestamps are Unix seconds, so millisecond spacing cannot be represented; previously long input failed deep in the core and short input silently returned no anomalies.
+Removing an unreachable return branch preserves the existing empty-DataFrame
+result when no anomalies are found (#20).
 
 ## [0.2.0] - 2026-08-08
 
@@ -96,3 +114,5 @@ the license both changed**, so read the migration notes below before upgrading.
   Python 3.
 
 [0.2.0]: https://github.com/wdm0006/pyculiar/releases/tag/v0.2.0
+
+[0.3.0]: https://github.com/wdm0006/pyculiar/compare/v0.2.1...v0.3.0
