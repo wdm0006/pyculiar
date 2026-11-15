@@ -76,8 +76,10 @@ def detect_ts(
         verbose: Pass verbosity to the detector and enable available warnings.
             Defaults to False.
         inplace: Mutate the input frame when True (default), including converting
-            timestamps to UTC datetimes. Column names are restored on normal
-            completion. False processes a deep copy instead.
+            timestamps to UTC datetimes. Original column names are restored on
+            every exit path, including the insufficient-context return and
+            exceptions raised during detection; the timestamp column stays
+            converted. False processes a deep copy instead.
         return_details: Add "direction" ("pos" or "neg", the sign of the tested
             residual) and "residual" (observation minus seasonal component minus
             series median, the value ESD tested) columns. Defaults to False.
@@ -169,130 +171,130 @@ def detect_ts(
     orig_header = df.columns.values
     df.rename(columns={df.columns.values[0]: "timestamp", df.columns.values[1]: "value"}, inplace=True)
 
-    if is_datetime:
-        ts = df["timestamp"]
-        ts = ts.dt.tz_localize("UTC") if ts.dt.tz is None else ts.dt.tz_convert("UTC")
-        df["timestamp"] = (ts - pd.Timestamp(0, tz="UTC")) / pd.Timedelta(seconds=1)
+    try:
+        if is_datetime:
+            ts = df["timestamp"]
+            ts = ts.dt.tz_localize("UTC") if ts.dt.tz is None else ts.dt.tz_convert("UTC")
+            df["timestamp"] = (ts - pd.Timestamp(0, tz="UTC")) / pd.Timedelta(seconds=1)
 
-    # now convert the timestamp column into a proper timestamp
-    df["timestamp"] = df["timestamp"].map(lambda x: datetime.datetime.fromtimestamp(x, tz=datetime.timezone.utc))
+        # now convert the timestamp column into a proper timestamp
+        df["timestamp"] = df["timestamp"].map(lambda x: datetime.datetime.fromtimestamp(x, tz=datetime.timezone.utc))
 
-    num_obs = len(df.value)
+        num_obs = len(df.value)
 
-    clamp = 1 / float(num_obs)
-    max_anoms = max(max_anoms, clamp)
+        clamp = 1 / float(num_obs)
+        max_anoms = max(max_anoms, clamp)
 
-    if longterm:
-        if gran == "day":
-            num_obs_in_period = period * piecewise_median_period_weeks + 1
-            num_days_in_period = 7 * piecewise_median_period_weeks + 1
-        else:
-            num_obs_in_period = period * 7 * piecewise_median_period_weeks
-            num_days_in_period = 7 * piecewise_median_period_weeks
-
-        last_date = df.timestamp.iloc[-1]
-
-        all_data = []
-
-        for j in range(0, len(df.timestamp), num_obs_in_period):
-            start_date = df.timestamp.iloc[j]
-            end_date = min(start_date + datetime.timedelta(days=num_obs_in_period), df.timestamp.iloc[-1])
-
-            # if there is at least 14 days left, subset it, otherwise subset last_date - 14days
-            if (end_date - start_date).days == num_days_in_period:
-                sub_df = df[(df.timestamp >= start_date) & (df.timestamp < end_date)]
+        if longterm:
+            if gran == "day":
+                num_obs_in_period = period * piecewise_median_period_weeks + 1
+                num_days_in_period = 7 * piecewise_median_period_weeks + 1
             else:
-                sub_df = df[
-                    (df.timestamp > (last_date - datetime.timedelta(days=num_days_in_period)))
-                    & (df.timestamp <= last_date)
-                ]
-            all_data.append(sub_df)
-    else:
-        all_data = [df]
+                num_obs_in_period = period * 7 * piecewise_median_period_weeks
+                num_days_in_period = 7 * piecewise_median_period_weeks
 
-    all_anoms = DataFrame(columns=["timestamp", "value", "residual"])
-    seasonal_plus_trend = DataFrame(columns=["timestamp", "value"])
+            last_date = df.timestamp.iloc[-1]
 
-    # Detect anomalies on all data (either entire data in one-pass, or in 2 week blocks if longterm=TRUE)
-    for i in range(len(all_data)):
-        directions = {"pos": Direction(True, True), "neg": Direction(True, False), "both": Direction(False, True)}
-        anomaly_direction = directions[direction]
+            all_data = []
 
-        # detect_anoms actually performs the anomaly detection and returns the result in a list containing the anomalies
-        # as well as the decomposed components of the time series for further analysis.
+            for j in range(0, len(df.timestamp), num_obs_in_period):
+                start_date = df.timestamp.iloc[j]
+                end_date = min(start_date + datetime.timedelta(days=num_obs_in_period), df.timestamp.iloc[-1])
 
-        s_h_esd_timestamps = detect_anoms(
-            all_data[i],
-            k=max_anoms,
-            alpha=alpha,
-            num_obs_per_period=period,
-            use_decomp=True,
-            one_tail=anomaly_direction.one_tail,
-            upper_tail=anomaly_direction.upper_tail,
-            verbose=verbose,
-            fill_missing=fill_missing,
-        )
-        if s_h_esd_timestamps is None:
-            return {"anoms": DataFrame(columns=["timestamp", "anoms"])}
-
-        # store decomposed comps in local variable and overwrite s_h_esd_timestamps to contain only the anom timestamps
-        data_decomp = s_h_esd_timestamps["stl"]
-        residual_by_ts = dict(zip(s_h_esd_timestamps["anoms"] or [], s_h_esd_timestamps["residuals"] or []))
-        s_h_esd_timestamps = s_h_esd_timestamps["anoms"]
-
-        # -- Step 3: Use detected anomaly timestamps to extract the actual anomalies (timestamp and value) from the data
-        if s_h_esd_timestamps:
-            anoms = all_data[i][all_data[i].timestamp.isin(s_h_esd_timestamps)].copy()
-            anoms = anoms[anoms.value.notna()]
-            anoms["residual"] = anoms.timestamp.map(residual_by_ts)
+                # if there is at least 14 days left, subset it, otherwise subset last_date - 14days
+                if (end_date - start_date).days == num_days_in_period:
+                    sub_df = df[(df.timestamp >= start_date) & (df.timestamp < end_date)]
+                else:
+                    sub_df = df[
+                        (df.timestamp > (last_date - datetime.timedelta(days=num_days_in_period)))
+                        & (df.timestamp <= last_date)
+                    ]
+                all_data.append(sub_df)
         else:
-            anoms = DataFrame(columns=["timestamp", "value", "residual"])
+            all_data = [df]
 
-        # Filter the anomalies using one of the thresholding functions if applicable
-        if threshold:
-            # Calculate daily max values
-            periodic_maxes = df.groupby(df.timestamp.map(Timestamp.date)).aggregate(np.max).value
+        all_anoms = DataFrame(columns=["timestamp", "value", "residual"])
+        seasonal_plus_trend = DataFrame(columns=["timestamp", "value"])
 
-            # Calculate the threshold set by the user
-            thresh = 0.5
-            if threshold == "med_max":
-                thresh = float(periodic_maxes.median())
-            elif threshold == "p95":
-                thresh = float(periodic_maxes.quantile(0.95))
-            elif threshold == "p99":
-                thresh = float(periodic_maxes.quantile(0.99))
+        # Detect anomalies on all data (either entire data in one-pass, or in 2 week blocks if longterm=TRUE)
+        for i in range(len(all_data)):
+            directions = {"pos": Direction(True, True), "neg": Direction(True, False), "both": Direction(False, True)}
+            anomaly_direction = directions[direction]
 
-            # Remove any anoms below the threshold
-            anoms = anoms[anoms.value >= thresh]
+            # detect_anoms actually performs the anomaly detection and returns the result in a list containing the anomalies
+            # as well as the decomposed components of the time series for further analysis.
 
-        all_anoms = pd.concat([all_anoms, anoms])
-        seasonal_plus_trend = pd.concat([seasonal_plus_trend, data_decomp])
+            s_h_esd_timestamps = detect_anoms(
+                all_data[i],
+                k=max_anoms,
+                alpha=alpha,
+                num_obs_per_period=period,
+                use_decomp=True,
+                one_tail=anomaly_direction.one_tail,
+                upper_tail=anomaly_direction.upper_tail,
+                verbose=verbose,
+                fill_missing=fill_missing,
+            )
+            if s_h_esd_timestamps is None:
+                return {"anoms": DataFrame(columns=["timestamp", "anoms"])}
 
-    # Cleanup potential duplicates
-    all_anoms = all_anoms.drop_duplicates(subset=["timestamp"])
-    seasonal_plus_trend = seasonal_plus_trend.drop_duplicates(subset=["timestamp"])
+            # store decomposed comps in local variable and overwrite s_h_esd_timestamps to contain only the anom timestamps
+            data_decomp = s_h_esd_timestamps["stl"]
+            residual_by_ts = dict(zip(s_h_esd_timestamps["anoms"] or [], s_h_esd_timestamps["residuals"] or []))
+            s_h_esd_timestamps = s_h_esd_timestamps["anoms"]
 
-    # name the columns back
-    df.rename(columns={"timestamp": orig_header[0], "value": orig_header[1]}, inplace=True)
+            # -- Step 3: Use detected anomaly timestamps to extract the actual anomalies (timestamp and value) from the data
+            if s_h_esd_timestamps:
+                anoms = all_data[i][all_data[i].timestamp.isin(s_h_esd_timestamps)].copy()
+                anoms = anoms[anoms.value.notna()]
+                anoms["residual"] = anoms.timestamp.map(residual_by_ts)
+            else:
+                anoms = DataFrame(columns=["timestamp", "value", "residual"])
 
-    all_anoms.index = all_anoms.timestamp
+            # Filter the anomalies using one of the thresholding functions if applicable
+            if threshold:
+                # Calculate daily max values
+                periodic_maxes = df.groupby(df.timestamp.map(Timestamp.date)).aggregate(np.max).value
 
-    if e_value:
-        d = {
-            "timestamp": all_anoms.timestamp,
-            "anoms": all_anoms.value,
-            "expected_value": seasonal_plus_trend[seasonal_plus_trend.timestamp.isin(all_anoms.timestamp)].value,
-        }
-    else:
-        d = {"timestamp": all_anoms.timestamp, "anoms": all_anoms.value}
+                # Calculate the threshold set by the user
+                thresh = 0.5
+                if threshold == "med_max":
+                    thresh = float(periodic_maxes.median())
+                elif threshold == "p95":
+                    thresh = float(periodic_maxes.quantile(0.95))
+                elif threshold == "p99":
+                    thresh = float(periodic_maxes.quantile(0.99))
 
-    if return_details:
-        d["direction"] = all_anoms.residual.map(lambda r: "pos" if r >= 0 else "neg")
-        d["residual"] = all_anoms.residual.astype(float)
+                # Remove any anoms below the threshold
+                anoms = anoms[anoms.value >= thresh]
 
-    anoms = DataFrame(d, index=d["timestamp"].index)
+            all_anoms = pd.concat([all_anoms, anoms])
+            seasonal_plus_trend = pd.concat([seasonal_plus_trend, data_decomp])
 
-    # convert timestamps back to unix time
-    anoms["timestamp"] = anoms["timestamp"].map(pd.Timestamp.timestamp)
+        # Cleanup potential duplicates
+        all_anoms = all_anoms.drop_duplicates(subset=["timestamp"])
+        seasonal_plus_trend = seasonal_plus_trend.drop_duplicates(subset=["timestamp"])
 
-    return {"anoms": anoms}
+        all_anoms.index = all_anoms.timestamp
+
+        if e_value:
+            d = {
+                "timestamp": all_anoms.timestamp,
+                "anoms": all_anoms.value,
+                "expected_value": seasonal_plus_trend[seasonal_plus_trend.timestamp.isin(all_anoms.timestamp)].value,
+            }
+        else:
+            d = {"timestamp": all_anoms.timestamp, "anoms": all_anoms.value}
+
+        if return_details:
+            d["direction"] = all_anoms.residual.map(lambda r: "pos" if r >= 0 else "neg")
+            d["residual"] = all_anoms.residual.astype(float)
+
+        anoms = DataFrame(d, index=d["timestamp"].index)
+
+        # convert timestamps back to unix time
+        anoms["timestamp"] = anoms["timestamp"].map(pd.Timestamp.timestamp)
+
+        return {"anoms": anoms}
+    finally:
+        df.rename(columns={"timestamp": orig_header[0], "value": orig_header[1]}, inplace=True)
