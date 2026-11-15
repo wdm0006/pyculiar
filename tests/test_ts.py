@@ -71,3 +71,25 @@ def test_longterm_overlapping_windows_have_unique_anoms(overlapping_windows_data
     assert len(anoms) == 2
     if e_value:
         assert anoms["expected_value"].notna().all()
+
+
+def _hourly(n, names=("when", "reading")):
+    return pd.DataFrame({names[0]: 1_699_999_200 + 3600 * np.arange(n), names[1]: 100.0})
+
+
+def test_insufficient_context_preserves_column_names():
+    df = _hourly(10)
+    result = detect_ts(df, granularity="hr")["anoms"]
+    assert result.empty
+    assert list(df.columns.values) == ["when", "reading"]
+
+
+def test_interior_nan_error_preserves_names_and_retry_succeeds():
+    df = _hourly(24 * 14)
+    df.loc[50, "reading"] = np.nan
+    with pytest.raises(ValueError):
+        detect_ts(df, granularity="hr")
+    assert list(df.columns.values) == ["when", "reading"]
+    result = detect_ts(df, granularity="hr", fill_missing="linear")["anoms"]
+    assert isinstance(result, pd.DataFrame)
+    assert list(df.columns.values) == ["when", "reading"]
