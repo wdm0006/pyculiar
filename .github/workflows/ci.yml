@@ -49,7 +49,7 @@ jobs:
       - name: Install package with dev dependencies
         run: |
           uv venv
-          uv pip install -e ".[dev]"
+          uv pip install -e ".[dev,examples]"
 
       - name: Run tests
         run: uv run pytest tests/ -v
