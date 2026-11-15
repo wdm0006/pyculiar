@@ -56,7 +56,8 @@ def detect_ts(
         df: Nonempty two-column DataFrame: timestamps followed by numeric
             observations. Timestamps are Unix seconds (int64 or float64) or a
             datetime64 column; naive datetimes are treated as UTC and tz-aware
-            ones are converted to UTC. Strings are rejected.
+            ones are converted to UTC. Strings are rejected. Observations
+            must not be +/-inf (NaN is governed by ``fill_missing``).
         max_anoms: Maximum anomaly fraction, default 0.10; must be at most 0.49.
             Clamped to at least one observation divided by the input length.
         direction: Anomaly direction: "pos", "neg", or "both". Defaults to "pos".
@@ -95,7 +96,7 @@ def detect_ts(
 
     Raises:
         ValueError: If the input is empty, has an invalid shape or timestamp/value
-            types, or an option fails validation.
+            types, contains infinite observations, or an option fails validation.
     """
 
     if not isinstance(df, DataFrame):
@@ -104,6 +105,9 @@ def detect_ts(
         if len(df.columns) != 2 or not df.iloc[:, 1].map(np.isreal).all():
             raise ValueError("""data must be a 2 column data.frame, with the first column being a set of timestamps, and
                                 the second coloumn being numeric values.""")
+
+        if np.isinf(df.iloc[:, 1].to_numpy(dtype=float)).any():
+            raise ValueError("The observation column must not contain infinite values (inf/-inf).")
 
         is_datetime = pd.api.types.is_datetime64_any_dtype(df.dtypes.iloc[0])
         if not is_datetime and df.dtypes.iloc[0].type is not np.float64 and df.dtypes.iloc[0].type is not np.int64:
