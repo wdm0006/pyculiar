@@ -103,7 +103,7 @@ def detect_anoms(
     # -- Step 1: Decompose data. This returns a univariate remainder which will be used for anomaly detection.
 
     data = data.set_index("timestamp")
-    filled_index = pd.DatetimeIndex([])
+    filled_index: pd.Index = pd.DatetimeIndex([])
 
     if not pd.api.types.is_integer_dtype(data.index):
         resample_periods = {3600: "s", 1440: "min", 24: "h", 7: "D"}
