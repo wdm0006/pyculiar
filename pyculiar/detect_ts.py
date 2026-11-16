@@ -49,6 +49,7 @@ def detect_ts(
     inplace: bool = True,
     return_details: bool = False,
     fill_missing: Literal["linear"] | None = None,
+    only_last: pd.Timedelta | None = None,
 ) -> dict[str, DataFrame]:
     """Detect anomalies in a seasonal univariate time series using S-H-ESD.
 
@@ -87,6 +88,15 @@ def detect_ts(
             valid ones. None (default) raises ValueError; "linear" interpolates
             them before decomposition. Leading and trailing NaNs are always
             dropped, and interpolated timestamps are never reported as anomalies.
+        only_last: Optional finite, strictly positive ``pd.Timedelta``. Detection,
+            thresholding and longterm deduplication run over the full input as
+            usual; only the finished result is restricted to timestamps strictly
+            greater than ``latest_input_timestamp - only_last``, where the latest
+            input timestamp is the maximum of the supplied data (never the wall
+            clock). Defaults to None (report everything). Insufficient-context
+            input still returns the empty two-column frame. Overlapping calls on
+            a rolling history can report the same anomaly twice; callers own
+            alert deduplication.
 
     Returns:
         A dictionary with an "anoms" DataFrame containing "timestamp" (Unix
@@ -95,6 +105,14 @@ def detect_ts(
         "direction" and "residual" are appended. No detections produce
         an empty frame. Insufficient data produces an empty frame with only
         "timestamp" and "anoms", even when e_value=True.
+
+    Example:
+        Monitor an hourly metric, alerting only on the last hour while the
+        whole history supplies the seasonal context::
+
+            recent = detect_ts(
+                history, granularity="hr", only_last=pd.Timedelta(hours=1), inplace=False
+            )["anoms"]
 
     Raises:
         ValueError: If the input is empty, has an invalid shape or timestamp/value
@@ -153,6 +171,11 @@ def detect_ts(
 
     if fill_missing not in (None, "linear"):
         raise ValueError("fill_missing options are: None | linear.")
+
+    if only_last is not None and (
+        not isinstance(only_last, pd.Timedelta) or pd.isna(only_last) or only_last <= pd.Timedelta(0)
+    ):
+        raise ValueError("only_last must be a finite, strictly positive pd.Timedelta or None.")
 
     if piecewise_median_period_weeks < 2:
         raise ValueError("piecewise_median_period_weeks must be at greater than 2 weeks")
@@ -274,6 +297,14 @@ def detect_ts(
         # Cleanup potential duplicates
         all_anoms = all_anoms.drop_duplicates(subset=["timestamp"])
         seasonal_plus_trend = seasonal_plus_trend.drop_duplicates(subset=["timestamp"])
+
+        if only_last is not None and len(all_anoms):
+            try:
+                cutoff = df.timestamp.max() - only_last
+            except OverflowError:
+                cutoff = None
+            if cutoff is not None:
+                all_anoms = all_anoms[all_anoms.timestamp > cutoff]
 
         all_anoms.index = all_anoms.timestamp
 
