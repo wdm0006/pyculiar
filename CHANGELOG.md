@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `detect_ts(only_last=pd.Timedelta(...))` reports only anomalies newer than
+  `latest_input_timestamp - only_last` while detection still uses the full
+  history. Default `None` is unchanged (#23).
+
 ### Changed
 
 - `detect_ts` now raises `ValueError` for `inf`/`-inf` observations instead of
