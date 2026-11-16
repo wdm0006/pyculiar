@@ -59,7 +59,21 @@ Parameters:
 - `e_value`: Include expected values in output (bool)
 - `return_details`: Add `direction` (`pos`/`neg`, sign of the tested residual) and `residual` (observation - seasonal - median, the value ESD tested) columns (bool, default False)
 - `fill_missing`: `None` (default) raises `ValueError` on NaNs between valid observations; `'linear'` interpolates them before decomposition. Leading/trailing NaNs are always dropped, and interpolated timestamps are never reported as anomalies
+- `only_last`: Optional positive `pd.Timedelta`. Detection still runs over the full history; only anomalies with timestamps strictly after `latest_input_timestamp - only_last` are returned (anchored to the newest input row, not the wall clock)
 - `longterm`: Enable piecewise processing for series > 1 month (bool)
+
+Monitoring recent data
+----------------------
+
+Seasonal detection needs history, but alerts usually concern only the latest data. Pass `only_last`
+to keep the full history as statistical context and report just the most recent window:
+
+```python
+recent = detect_ts(history, granularity="hr", only_last=pd.Timedelta(hours=1), inplace=False)["anoms"]
+```
+
+This is a reporting filter applied to the finished result, not a streaming mode. Repeated overlapping
+calls can return the same anomaly more than once, so callers must deduplicate alerts themselves.
 
 Run the tests
 -------------
