@@ -40,6 +40,7 @@ def detect_anoms(
     upper_tail: bool = True,
     verbose: bool = False,
     fill_missing: Literal["linear"] | None = None,
+    gap_policy: Literal["error", "interpolate"] | None = None,
 ) -> dict[str, Any] | None:
     """
     Detects anomalies in a time series using S-H-ESD.
@@ -55,6 +56,9 @@ def detect_anoms(
                     If FALSE and one_tail is TRUE, only detect negative (left-tailed) anomalies.
         verbose: Additionally printing for debugging.
         fill_missing: None raises on interior NAs; "linear" interpolates them before decomposition.
+        gap_policy: How to treat empty time bins after resampling. None drops them (default);
+            "error" raises ValueError naming the first empty bin; "interpolate" reindexes to the
+            full regular grid and fills linearly. Filled bins are never reported as anomalies.
 
     Returns:
         A dictionary containing the anomalies (anoms), decomposition components (stl), and
@@ -66,6 +70,9 @@ def detect_anoms(
 
     if fill_missing not in (None, "linear"):
         raise ValueError("fill_missing options are: None | linear.")
+
+    if gap_policy not in (None, "error", "interpolate"):
+        raise ValueError("gap_policy options are: None | error | interpolate.")
 
     if list(data.columns.values) != ["timestamp", "value"]:
         data.columns = ["timestamp", "value"]
@@ -96,13 +103,25 @@ def detect_anoms(
     # -- Step 1: Decompose data. This returns a univariate remainder which will be used for anomaly detection.
 
     data = data.set_index("timestamp")
+    filled_index: pd.Index = pd.DatetimeIndex([])
 
     if not pd.api.types.is_integer_dtype(data.index):
         resample_periods = {3600: "s", 1440: "min", 24: "h", 7: "D"}
         resample_period = resample_periods.get(num_obs_per_period)
         if not resample_period:
             raise ValueError(f"Unsupported resample period: {num_obs_per_period}")
-        data = data.resample(resample_period).mean().dropna()
+        data = data.resample(resample_period).mean()
+        missing = data.value.isna()
+        if gap_policy == "error" and missing.any():
+            raise ValueError(
+                f"Time series has missing {resample_period!r} bins; first gap at {data.index[missing.to_numpy()][0]}. "
+                "Pass gap_policy='interpolate' to fill them or regularize the data before calling."
+            )
+        if gap_policy == "interpolate":
+            filled_index = data.index[missing.to_numpy()]
+            data["value"] = data.value.interpolate(method="linear")
+        else:
+            data = data.dropna()
 
     # Use C extension for seasonal decomposition
     values = data.value.tolist()
@@ -140,6 +159,10 @@ def detect_anoms(
 
     # Use C extension for ESD test
     anom_indices = c_esd_test(data.value.tolist(), max_outliers, alpha, one_tail, upper_tail)
+
+    if len(filled_index):
+        timestamps_all = data.timestamp.tolist()
+        anom_indices = [i for i in anom_indices if timestamps_all[i] not in filled_index]
 
     # Map 0-based indices back to DataFrame timestamp values
     if anom_indices:

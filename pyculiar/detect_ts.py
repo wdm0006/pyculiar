@@ -49,6 +49,7 @@ def detect_ts(
     inplace: bool = True,
     return_details: bool = False,
     fill_missing: Literal["linear"] | None = None,
+    gap_policy: Literal["error", "interpolate"] | None = None,
     only_last: pd.Timedelta | None = None,
 ) -> dict[str, DataFrame]:
     """Detect anomalies in a seasonal univariate time series using S-H-ESD.
@@ -88,6 +89,13 @@ def detect_ts(
             valid ones. None (default) raises ValueError; "linear" interpolates
             them before decomposition. Leading and trailing NaNs are always
             dropped, and interpolated timestamps are never reported as anomalies.
+        gap_policy: How to treat absent time bins after resampling to the
+            granularity. None (default) drops them, so the seasonal period counts
+            observations rather than time slots. "error" raises ValueError naming
+            the first empty bin. "interpolate" reindexes to the full regular grid and
+            fills linearly; filled bins are never reported as anomalies.
+            Detections are matched to original rows by their floored bin, so
+            timestamps not aligned to the granularity still return the original row.
         only_last: Optional finite, strictly positive ``pd.Timedelta``. Detection,
             thresholding and longterm deduplication run over the full input as
             usual; only the finished result is restricted to timestamps strictly
@@ -172,6 +180,9 @@ def detect_ts(
     if fill_missing not in (None, "linear"):
         raise ValueError("fill_missing options are: None | linear.")
 
+    if gap_policy not in (None, "error", "interpolate"):
+        raise ValueError("gap_policy options are: None | error | interpolate.")
+
     if only_last is not None and (
         not isinstance(only_last, pd.Timedelta) or pd.isna(only_last) or only_last <= pd.Timedelta(0)
     ):
@@ -236,6 +247,7 @@ def detect_ts(
         else:
             all_data = [df]
 
+        bin_freq = {"sec": "s", "min": "min", "hr": "h", "day": "D"}[gran]
         all_anoms = DataFrame(columns=["timestamp", "value", "residual"])
         seasonal_plus_trend = DataFrame(columns=["timestamp", "value"])
 
@@ -257,6 +269,7 @@ def detect_ts(
                 upper_tail=anomaly_direction.upper_tail,
                 verbose=verbose,
                 fill_missing=fill_missing,
+                gap_policy=gap_policy,
             )
             if s_h_esd_timestamps is None:
                 return {"anoms": DataFrame(columns=["timestamp", "anoms"])}
@@ -268,9 +281,14 @@ def detect_ts(
 
             # -- Step 3: Use detected anomaly timestamps to extract the actual anomalies (timestamp and value) from the data
             if s_h_esd_timestamps:
-                anoms = all_data[i][all_data[i].timestamp.isin(s_h_esd_timestamps)].copy()
+                sub = all_data[i]
+                bins = pd.DatetimeIndex(pd.to_datetime(sub.timestamp, utc=True)).floor(bin_freq)
+                detected = pd.DatetimeIndex(pd.to_datetime(list(s_h_esd_timestamps), utc=True))
+                anoms = sub[bins.isin(detected)].copy()
                 anoms = anoms[anoms.value.notna()]
-                anoms["residual"] = anoms.timestamp.map(residual_by_ts)
+                anoms["residual"] = bins[bins.isin(detected) & sub.value.notna().to_numpy()].map(
+                    {pd.Timestamp(t): r for t, r in residual_by_ts.items()}
+                )
             else:
                 anoms = DataFrame(columns=["timestamp", "value", "residual"])
 
